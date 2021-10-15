@@ -2,7 +2,7 @@
 
 A Extract, Transform, Load (ETL) pipeline based on [Apache Airflow](https://airflow.apache.org/). It periodically _extracts_ sensor data from wearables and mobile apps used in the [IDEA-FAST](www.idea-fast.eu) clinical observation study, _transforms_ the data by associating the appropriate anonymised participants, and _loads_ the data into the IDEA-FAST Data Management Portal.
 
-## Installation
+## Development
 
 [Poetry](https://python-poetry.org/) is used for dependency management and
 [pyenv](https://github.com/pyenv/pyenv) to manage python installations, so
@@ -13,15 +13,14 @@ please make sure this is installed via pyenv, e.g.
 
 Once done, you can install dependencies for this project via:
 
-    poetry install --no-dev
-
-To setup a virtual environment with your local pyenv version run:
-
-    poetry shell
-
-## Local Development
-
-For development, install additional dependencies through:
-
     poetry install
     poetry run pre-commit install
+
+In order to run Apache Airflow within the virtual environment, spin up a `poetry shell` whilst parsing the `dev.env` environmental variables into it. Then, initiate an airflow instance:
+
+    env $(cat dev.env) poetry shell
+    airflow standalone
+
+Navigate to _localhost:8080_ to see the Airflow UI. If you need to interact within the shell in the terminal, be sure to open another tab and join the shel with the `.env` included as above. For example, you can see the available dags by running:
+
+    airflow dags list

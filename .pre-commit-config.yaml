@@ -21,8 +21,8 @@ repos:
     entry: poetry run isort
     language: system
     types: [python]
-  - id: mypy
-    name: mypy
-    entry: poetry run mypy
-    language: system
-    types: [python]
+  # - id: mypy
+  #   name: mypy
+  #   entry: poetry run mypy
+  #   language: system
+  #   types: [python]

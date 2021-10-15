@@ -1,0 +1,5 @@
+[flake8]
+select = AAA,B,B9,BLK,C,E,F,I,S,W
+ignore = E203,E501,W503,S322,S309,I201,I100,I001,I005, S101, W293, AAA05, B902
+max-line-length = 95
+application-import-names = data_transfer, consumer, tests

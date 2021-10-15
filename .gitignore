@@ -2,3 +2,8 @@
 **/*/__pycache__/
 __pycache__
 *.env
+
+# Airflow Development
+airflow/*
+!airflow/.gitkeep
+!dev.env

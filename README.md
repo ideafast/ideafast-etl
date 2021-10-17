@@ -21,6 +21,10 @@ In order to run Apache Airflow within the virtual environment, spin up a `poetry
     env $(cat dev.env) poetry shell
     airflow standalone
 
+> **NOTE**: the Airflow `standalone` is not to be used in production, only for getting started and local development.
+
+> **NOTE 2**: Airflow explicitely states that it does not support `Poetry` as we do here, primarily as it does not incorporates the referred `constraints.txt` that is used when installing through `pip`. For now, no issues seem to occur - do let us know if this is different on you machine.
+
 Navigate to _localhost:8080_ to see the Airflow UI. If you need to interact within the shell in the terminal, be sure to open another tab and join the shel with the `.env` included as above. For example, you can see the available dags by running:
 
     airflow dags list

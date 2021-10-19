@@ -14,30 +14,23 @@ def run_command(command: str, capture: bool = False) -> subprocess.CompletedProc
     return subprocess.run([command], shell=True, capture_output=capture)  # noqa
 
 
-def docker_image_exists(version: str) -> str:
-    """Check if docker image exists based on version."""
-    command = f"docker images -q {DOCKER_REGISTRY}:{version}"
-    res = run_command(command, True)
-    # The hash ID of the image if it exists
-    return res.stdout.decode("ascii").rstrip()
-
-
-def get_version() -> str:
+def get_version() -> Optional[str]:
     """Return the current Poetry tag version (which is synced with Git and Docker)"""
     res = run_command("poetry version -s", True)
-    return res.stdout.decode("ascii").rstrip()
+    return res.stdout.decode("ascii").rstrip() or None
 
 
-def get_docker_tags() -> str:
+def get_latest_docker_tag() -> Optional[str]:
     res = run_command(
-        f"docker images {DOCKER_REGISTRY} --format '{{.Tag}} | sort | head -n 1'", True
+        f"docker images {DOCKER_REGISTRY} --format {{{{.Tag}}}} | sort | head -n 1",
+        True,
     )
-    return res.stdout.decode("ascii").rstrip()
+    return res.stdout.decode("ascii").rstrip() or None
 
 
-def get_latest_git_tag() -> str:
-    res = run_command("git tag --sort=-refname |head -n 10", True)
-    return res.stdout.decode("ascii").rstrip()
+def get_latest_git_tag() -> Optional[str]:
+    res = run_command("git tag --sort=-refname |head -n 1", True)
+    return res.stdout.decode("ascii").rstrip() or None
 
 
 def bump_version(bump: str) -> str:
@@ -54,7 +47,7 @@ def push_version_remote(version: str) -> None:
 
 
 def build_docker(version: str) -> None:
-    run_command(f"docker build -f Dockerfile -t {DOCKER_REGISTRY}:{version}")
+    run_command(f"docker build . -f Dockerfile -t {DOCKER_REGISTRY}:{version}")
 
 
 @click.group()
@@ -63,26 +56,48 @@ def cli() -> None:
 
 
 @cli.command()
-def build(bump: Optional[str]) -> None:
-    """Build the docker image and update git and poetry tags."""
+@click.option(
+    "--bump_type",
+    "-b",
+    required=True,
+    type=click.Choice(VERSION_BUMPS, case_sensitive=False),
+)
+def bump(bump_type: str) -> str:
+    """Bump version number."""
 
-    if bump not in VERSION_BUMPS:
-        version = get_version()
-        message = f"You are not bumping the version\n. \
-        Are you sure you want to rebuild {DOCKER_REGISTRY} - {version}?"
+    new_version = bump_version(bump_type)
 
+    if click.confirm("Do you want to push this tag to GitHub too?"):
+        push_version_remote(new_version)
+
+    return new_version
+
+
+@cli.command()
+@click.option(
+    "--bump_type", "-b", type=click.Choice(VERSION_BUMPS, case_sensitive=False)
+)
+def build(bump_type: Optional[str] = None) -> None:
+    """Build the docker image and optionally bump version"""
+    version = get_version()
+    docker_version = get_latest_docker_tag()
+    build_version = version  # if not bumped
+
+    if bump_type in VERSION_BUMPS:
+        build_version = bump(bump_type)
+
+    # the current poetry/git version is higher or no Docker version exists
+    if docker_version and int(version.replace(".", "")) <= int(
+        docker_version.replace(".", "")
+    ):
+        message = (
+            f"You are not bumping the version\n"
+            f"Are you sure you want to rebuild {DOCKER_REGISTRY} - {version}?"
+        )
         click.confirm(message, abort=True)
 
-        # build the current version! txt.rsplit(maxsplit=1)
-
-    else:
-        new_version = bump_version(bump)
-        click.echo(
-            f"Poetry and lightweight git tag bumped to {new_version}\nBuilding Docker image now."
-        )
-        build_docker(new_version)
-        click.confirm("Do you want to push this tag to GitHub too?", abort=True)
-        push_version_remote(new_version)
+    build_docker(build_version)
+    click.echo(f"\nCompleted. Latest Docker image: {get_latest_docker_tag}")
 
 
 @cli.command()
@@ -90,7 +105,7 @@ def version() -> None:
     """Displays current version tags"""
     click.echo(f"Poetry: {get_version()}")
     click.echo(f"Git: {get_latest_git_tag()}")
-    click.echo(f"Docker: {get_latest_git_tag()}")
+    click.echo(f"Docker: {get_latest_docker_tag()}")
 
 
 if __name__ == "__main__":

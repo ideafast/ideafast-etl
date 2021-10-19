@@ -47,6 +47,11 @@ def push_version_remote(version: str) -> None:
 
 
 def build_docker(version: str) -> None:
+    # Export the poetry (non-dev) requirements
+    run_command(
+        "poetry export -f requirements.txt --output requirements.txt --without-hashes"
+    )
+    # Build the image, which picks up the requirements file
     run_command(f"docker build . -f Dockerfile -t {DOCKER_REGISTRY}:{version}")
 
 
@@ -97,7 +102,24 @@ def build(bump_type: Optional[str] = None) -> None:
         click.confirm(message, abort=True)
 
     build_docker(build_version)
-    click.echo(f"\nCompleted. Latest Docker image: {get_latest_docker_tag}")
+    click.echo(
+        f"\nCompleted. Latest Docker image: {build_version}\n"
+        f"To use it, update the image version in your .env and run docker-compose up -d"
+    )
+
+
+@cli.command()
+def publish() -> None:
+    """Publish latest Docker image"""
+    version = get_latest_docker_tag()
+    if not version and click.confirm(
+        f"No local image found for version {get_version()}\n"
+        f"Do you want to build AND then publish it?",
+        abort=True,
+    ):
+        build()
+
+    run_command(f"docker push {DOCKER_REGISTRY}:{get_latest_docker_tag()}")
 
 
 @cli.command()

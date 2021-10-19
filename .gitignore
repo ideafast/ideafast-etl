@@ -7,3 +7,6 @@ __pycache__
 airflow/*
 !airflow/.gitkeep
 !dev.env
+logs/
+plugins/
+dags/

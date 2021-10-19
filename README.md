@@ -10,7 +10,7 @@ A Extract, Transform, Load (ETL) pipeline based on [Apache Airflow](https://airf
 pyenv install 3.8.0 && pyenv global 3.8.0
 ```
 
-Once done, you can install dependencies for this project via:
+Once done, clone the repo to your machine and install dependencies for this project via:
 
 ```shell
 poetry install

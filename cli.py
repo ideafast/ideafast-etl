@@ -52,7 +52,9 @@ def build_docker(version: str) -> None:
         "poetry export -f requirements.txt --output requirements.txt --without-hashes"
     )
     # Build the image, which picks up the requirements file
-    run_command(f"docker build . -f Dockerfile -t {DOCKER_REGISTRY}:{version}")
+    run_command(
+        f"docker build -f Dockerfile -t {DOCKER_REGISTRY}:{version} -t {DOCKER_REGISTRY}:latest ."
+    )
 
 
 @click.group()
@@ -119,7 +121,7 @@ def publish() -> None:
     ):
         build()
 
-    run_command(f"docker push {DOCKER_REGISTRY}:{get_latest_docker_tag()}")
+    run_command(f"docker push {DOCKER_REGISTRY} --all-tags")
 
 
 @cli.command()

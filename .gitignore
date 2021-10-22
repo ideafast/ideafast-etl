@@ -9,4 +9,3 @@ airflow/*
 !dev.env
 logs/
 plugins/
-dags/

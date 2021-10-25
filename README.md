@@ -86,3 +86,14 @@ To run all these libraries:
 Or individual checks by choosing one of the options from the list:
 
     poetry run nox -rs [tests, mypy, lint, black]
+
+--------
+--------
+
+# Note about _atomicity_ and _idempotency_
+
+As outlined by [Bas Harenslak and Julian Rutger de Ruiter](https://github.com/BasPH/data-pipelines-with-apache-airflow), Apache Airflow is a very powerful tool - especially when needed for timewindow based batch operations. Ideally, DAGs and their tasks are **idempotent**, such that calling the same task multiple times with the same inputs should not change the overall output. In addition, tasks execution should be **atomic**, such that succeed and produce some proper result or fail in a manner that does not affect the state of the system (think of sending a 'success' email before a tasks has completed sucesfully).
+
+Whilst we closely follow the best practice in atomicity, the IDEA-FAST pipeline steers away from idempotency. This is purposely done, as the extracted data is not finite across timewindows, nor is it 'ready' for extraction at an agreed time. As such, we cannot ensure the idempotency of rerunning a specific task - even if our Airflow DAGs are designed that way. Instead, IDEA-FAST uses the ETL pipeline to get extract and load any new data (somewhat) as soon as it's available - so that our clinicians 'on the ground' can inspect the data as soon as possible. In result, our ETL pipeline effectively polls the data from our device providers and acts when new data is found.
+
+To support the data _as available_ approach (contrasting a fixed time window approach), the pipeline utilise an additional database to keep a historical record of past processed files - allowing detecting of new and old additions to process.

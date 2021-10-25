@@ -43,6 +43,8 @@ poetry install
 poetry run pre-commit install
 ```
 
+> Note that `click` is a core dependency solely for using the CLI locally, but is actually not required for the Docker image deployment.
+
 When adding depencies in development, consider if these are for development or needed in production, then run with or without the `--dev` flag:
 ```shell
 poetry add new-dependency
@@ -72,3 +74,15 @@ To check the current version of the Poetry package, local Git (_Git and Poetry a
 ```shell
 poetry run version
 ```
+
+### Running Tests, Type Checking, Linting and Code Formatting
+
+[Nox](https://nox.thea.codes/) is used for automation and standardisation of tests, type hints, automatic code formatting, and linting. Any contribution needs to pass these tests before creating a Pull Request.
+
+To run all these libraries:
+
+    poetry run nox -r
+
+Or individual checks by choosing one of the options from the list:
+
+    poetry run nox -rs [tests, mypy, lint, black]

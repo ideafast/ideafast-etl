@@ -6,6 +6,7 @@ authors = ["David <davidverweij@gmail.com>"]
 
 [tool.poetry.dependencies]
 python = "^3.8"
+click = "^8.0.3"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
@@ -18,15 +19,31 @@ flake8-black = "^0.2.3"
 flake8-bugbear = "^21.9.2"
 isort = "^5.9.3"
 mypy = "^0.910"
-click = "^8.0.3"
 apache-airflow = "^2.2.0"
+coverage = {extras = ["toml"], version = "^6.0.2"}
+pytest-cov = "^3.0.0"
+nox = "^2021.10.1"
+nox-poetry = "^0.8.6"
 
 [tool.poetry.scripts]
-build = "cli:build"
-version = "cli:version"
-bump = "cli:bump"
-publish = "cli:publish"
+build = "ideafast_etl.utils.cli:build"
+version = "ideafast_etl.utils.cli:version"
+bump = "ideafast_etl.utils.cli:bump"
+publish = "ideafast_etl.utils.cli:publish"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.coverage.paths]
+source = ["ideafast_etl"]
+
+[tool.coverage.run]
+branch = true
+source = ["ideafast_etl"]
+
+[tool.coverage.report]
+show_missing = true
+
+[tool.isort]
+profile = "black"

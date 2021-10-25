@@ -3,10 +3,18 @@
 __pycache__
 *.env
 
+# Exported reuirements, better to export locally
+requirements.txt
+
 # Airflow Development
 airflow/*
 !airflow/.gitkeep
 !dev.env
 logs/
 plugins/
-dags/
+
+# Testing
+.coverage
+.pytest_cache
+.mypy_cache
+.nox

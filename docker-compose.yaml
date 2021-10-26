@@ -34,12 +34,18 @@
 # _AIRFLOW_WWW_USER_PASSWORD   - Password for the administrator account (if requested).
 #                                Default: airflow
 ---
-version: '3'
+version: '3.5'
+
+x-ideafast-etl-variables:
+  &ideafast-etl-env
+  AIRFLOW_CONN_MONGO_DEFAULT: 'mongodb://${_MONGO_INITDB_ROOT_USERNAME}:${_MONGO_INITDB_ROOT_PASSWORD}@mongo:27017/%3FauthSource%3Dadmin'
+
 x-airflow-common:
   &airflow-common
   image: ${AIRFLOW_IMAGE_NAME}
   environment:
     &airflow-common-env
+    <<: *ideafast-etl-env
     AIRFLOW__CORE__EXECUTOR: CeleryExecutor
     AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
     AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres/airflow
@@ -58,6 +64,8 @@ x-airflow-common:
     redis:
       condition: service_healthy
     postgres:
+      condition: service_healthy
+    mongodb:
       condition: service_healthy
 
 services:
@@ -84,6 +92,26 @@ services:
       interval: 5s
       timeout: 30s
       retries: 50
+    restart: always
+
+  mongodb:
+    container_name: mongo
+    image: mongo:5.0
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${_MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${_MONGO_INITDB_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ideafast_etl
+    ports:
+      - 27017:27017
+    volumes:
+      - mongo-db-volume:/data/db
+      - ./local/mongo-init.sh:/docker-entrypoint-initdb.d/mongo-init.sh:ro
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongo mongo:27017/test --quiet
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     restart: always
 
   airflow-webserver:
@@ -259,3 +287,4 @@ services:
 
 volumes:
   postgres-db-volume:
+  mongo-db-volume:

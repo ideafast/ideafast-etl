@@ -20,13 +20,19 @@ Apache Airflow is ran using `Docker`, so please ensure you have a Docker client 
 1. Once it's finished, you can spin up the Airflow containers, run:
 
     ```shell
-    docker-compose up
+    docker-compose up -d
     ```
     You can check the status of the Docker containers by running `docker ps`, which should indiciate _(healthy)_ after a short while.
 1. Navigate to _localhost:8080_ to see the Airflow UI. You can also check Airflow's status with some CLI commands, such as:
     ```shell
     curl -X GET --user "$username:$userpass" "http://localhost:8080/api/v1/dags"
     ```
+
+1. It is recommended to properly shut down the docker container once you are finished. Run
+    ```shell
+    docker-compose down
+    ```
+    to do so. Note that volumes are persisted - including set variables, connections and user accounts.
 
 ## Local development
 
@@ -75,6 +81,36 @@ To check the current version of the Poetry package, local Git (_Git and Poetry a
 poetry run version
 ```
 
+### CLI with Airflow Docker
+
+You can interact with Airflow in the docker containers through the command line using `docker compose run`. On MacOS / Linux, use the provided wrapper script to simplify the command (run `chmod +x airflow.sh` once to enable it) - see also the [docs](https://airflow.apache.org/docs/apache-airflow/stable/start/docker.html#running-the-cli-commands).
+
+Ensure that you are in a `poetry shell` to use the `airflow` dev dependency, and that you spun up the docker containers using `docker-compose up`. Then prepend any CLI command with
+```shell
+./airflow.sh [command]                               # MacOs/Linux
+docker-compose run airflow-worker airflow [command]  # Windows
+```
+
+Example cli commands (using the wrapper script):
+```shell
+./airflow.sh info   # get generic info
+./airflow.sh dags list   # list all known dags
+./airflow.sh dags test dummy_dag 2021-10-26   # run 'dummy_dag' DAG once (whether it is paused or not)
+./airflow.sh dags test dummy_dag 2021-10-26 --dry-run   # dry-run 'dummy_dag' DAG to see {{ templates variables }} rendered
+
+./airflow.sh cheat-sheet   # show CLI commands
+```
+
+### Maintainability
+
+Below are some design choices based on our need to maintain the pipeline in the future with the least amount of work.
+
+#### Variables
+
+For any known [variables](https://airflow.apache.org/docs/apache-airflow/stable/howto/variable.html), [connection URIs](https://airflow.apache.org/docs/apache-airflow/stable/howto/connection.html) (e.g., username/passwords), Airflow enables us to pass these through as environmental variables (e.g., the mongo DB connection string). However, any environmental variable is not shown (or editable) in the UI. In order to allow the Airflow maintainer to easily update any connection URI or variable when needed, connections and variables that have the potential to change need to be added manually in the UI. _As long as you don't delete the `postrgres-db-volume` volume, these details will persists across spin ups and downs_. Any internal connections or variables are added through environmental variables.
+
+> Note, DAGS also have access to Airflow Engine variables at runtime, which can be used through {{Jinja templating}}. See a [list of out-of-the-box available variables](https://airflow.apache.org/docs/apache-airflow/stable/templates-ref.html).
+
 ### Running Tests, Type Checking, Linting and Code Formatting
 
 [Nox](https://nox.thea.codes/) is used for automation and standardisation of tests, type hints, automatic code formatting, and linting. Any contribution needs to pass these tests before creating a Pull Request.
@@ -86,3 +122,14 @@ To run all these libraries:
 Or individual checks by choosing one of the options from the list:
 
     poetry run nox -rs [tests, mypy, lint, black]
+
+--------
+--------
+
+# Note about _atomicity_ and _idempotency_
+
+As outlined by [Bas Harenslak and Julian Rutger de Ruiter](https://github.com/BasPH/data-pipelines-with-apache-airflow), Apache Airflow is a very powerful tool - especially when needed for timewindow based batch operations. Ideally, DAGs and their tasks are **idempotent**, such that calling the same task multiple times with the same inputs should not change the overall output. In addition, tasks execution should be **atomic**, such that succeed and produce some proper result or fail in a manner that does not affect the state of the system (think of sending a 'success' email before a tasks has completed sucesfully).
+
+Whilst we closely follow the best practice in atomicity, the IDEA-FAST pipeline steers away from idempotency. This is purposely done, as the extracted data is not finite across timewindows, nor is it 'ready' for extraction at an agreed time. As such, we cannot ensure the idempotency of rerunning a specific task - even if our Airflow DAGs are designed that way. Instead, IDEA-FAST uses the ETL pipeline to get extract and load any new data (somewhat) as soon as it's available - so that our clinicians 'on the ground' can inspect the data as soon as possible. In result, our ETL pipeline effectively polls the data from our device providers and acts when new data is found.
+
+To support the data _as available_ approach (contrasting a fixed time window approach), the pipeline utilise an additional database to keep a historical record of past processed files - allowing detecting of new and old additions to process.

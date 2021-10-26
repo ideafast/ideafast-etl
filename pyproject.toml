@@ -6,7 +6,7 @@ authors = ["David <davidverweij@gmail.com>"]
 
 [tool.poetry.dependencies]
 python = "^3.8"
-click = "^8.0.3"
+click = "^7.1.2"
 apache-airflow-providers-mongo = "^2.1.0"
 
 [tool.poetry.dev-dependencies]

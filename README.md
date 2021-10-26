@@ -93,12 +93,12 @@ docker-compose run airflow-worker airflow [command]  # Windows
 
 Example cli commands (using the wrapper script):
 ```shell
-./airflow.sh info # get generic info
-./airflow.sh dags list # list all known dags
-./airflow.sh dags test dummy_dag 2021-10-26 # run 'dummy_dag' DAG once (whether it is paused or not)
-./airflow.sh dags test dummy_dag 2021-10-26 --dry-run # dry-run 'dummy_dag' DAG to see {{ templates variables }} rendered
-...
-./airflow.sh cheat-sheet                       # show CLI commands
+./airflow.sh info   # get generic info
+./airflow.sh dags list   # list all known dags
+./airflow.sh dags test dummy_dag 2021-10-26   # run 'dummy_dag' DAG once (whether it is paused or not)
+./airflow.sh dags test dummy_dag 2021-10-26 --dry-run   # dry-run 'dummy_dag' DAG to see {{ templates variables }} rendered
+
+./airflow.sh cheat-sheet   # show CLI commands
 ```
 
 ### Maintainability

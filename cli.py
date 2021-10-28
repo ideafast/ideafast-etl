@@ -22,7 +22,8 @@ def get_version() -> Optional[str]:
 
 def get_latest_docker_tag() -> Optional[str]:
     res = run_command(
-        f"docker images {DOCKER_REGISTRY} --format {{{{.Tag}}}} | sort | head -n 1",
+        f"docker images {DOCKER_REGISTRY} --format {{{{.Tag}}}} "
+        f"| egrep -v 'latest' | sort -r | head -n 1",
         True,
     )
     return res.stdout.decode("ascii").rstrip() or None

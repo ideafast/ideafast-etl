@@ -111,6 +111,10 @@ For any known [variables](https://airflow.apache.org/docs/apache-airflow/stable/
 
 > Note, DAGS also have access to Airflow Engine variables at runtime, which can be used through {{Jinja templating}}. See a [list of out-of-the-box available variables](https://airflow.apache.org/docs/apache-airflow/stable/templates-ref.html).
 
+#### (sub)modules
+
+This repository is somewhat odd as a 'package', as only the `/ideafast_etl` subfolder gets mounted in the docker container. As such, module import works differently from within Apache Airflow as it does for the testing suite. To 'quickly' overcome this for development, the test-suite needs to manually add the reference to the (for Airflow) local import using the [`conftest.py'](/tests/conftest.py) fixture. Airflow documentation suggest using [Plugins](https://airflow.apache.org/docs/apache-airflow/stable/plugins.html) but for our purposes we mainly want share-able function across DAGS - and will use the current setup until a better approach is found.
+
 ### Running Tests, Type Checking, Linting and Code Formatting
 
 [Nox](https://nox.thea.codes/) is used for automation and standardisation of tests, type hints, automatic code formatting, and linting. Any contribution needs to pass these tests before creating a Pull Request.
@@ -123,6 +127,7 @@ Or individual checks by choosing one of the options from the list:
 
     poetry run nox -rs [tests, mypy, lint, black]
 
+--------
 --------
 --------
 

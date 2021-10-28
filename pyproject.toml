@@ -27,10 +27,10 @@ nox = "^2021.10.1"
 nox-poetry = "^0.8.6"
 
 [tool.poetry.scripts]
-build = "ideafast_etl.utils.cli:build"
-version = "ideafast_etl.utils.cli:version"
-bump = "ideafast_etl.utils.cli:bump"
-publish = "ideafast_etl.utils.cli:publish"
+build = "cli:build"
+version = "cli:version"
+bump = "cli:bump"
+publish = "cli:publish"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

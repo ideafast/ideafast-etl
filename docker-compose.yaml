@@ -105,7 +105,7 @@ services:
       - 27017:27017
     volumes:
       - mongo-db-volume:/data/db
-      - ./local/mongo-init.sh:/docker-entrypoint-initdb.d/mongo-init.sh:ro
+      - ./init/mongo-init.sh:/docker-entrypoint-initdb.d/mongo-init.sh:ro
     healthcheck:
       test: echo 'db.runCommand("ping").ok' | mongo mongo:27017/test --quiet
       interval: 10s
@@ -116,7 +116,11 @@ services:
 
   airflow-webserver:
     <<: *airflow-common
-    command: webserver
+    command: >
+      bash -c "
+      airflow pools import init/pools.json &&
+      airflow webserver
+      "
     ports:
       - 8080:8080
     healthcheck:

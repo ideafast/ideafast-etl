@@ -3,7 +3,7 @@ from unittest.mock import patch
 import click.testing
 import pytest
 
-from ideafast_etl.utils import cli
+import cli
 
 
 @pytest.fixture
@@ -21,7 +21,7 @@ def test_version_succeeds(runner: click.testing.CliRunner) -> None:
 def test_abc_aborted(runner: click.testing.CliRunner) -> None:
     bump_type = "patch"
 
-    with patch("ideafast_etl.utils.cli.run_command") as mock_run_command:
+    with patch("cli.run_command") as mock_run_command:
 
         result = runner.invoke(cli.bump, ["-b", bump_type])
 

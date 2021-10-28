@@ -2,7 +2,7 @@ from datetime import datetime
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from utils import db
+from etl_utils import db
 
 # DAG setup with tasks
 with DAG(

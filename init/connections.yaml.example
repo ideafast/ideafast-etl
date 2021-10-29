@@ -1,0 +1,17 @@
+# Example connections.yaml file that get's loaded when airflow spins up the first time
+# This add `connections` amd `variables` to Airflow, but if the container already spun up
+# before, leaves the (possibly adjusted) in place. See docker-file airflow-webserver
+
+dreem_kiel:
+  conn_type: HTTP
+  description: "Custom API connection with Dreem servers"
+  host: deem_url_api
+  login: deem_user_kiel
+  password: dreem_pass_kiel
+  extra: |
+    {
+      token_host: dreem_token_url
+      user_id: ""
+    }
+  port: null
+  schema: null

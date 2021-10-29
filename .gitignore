@@ -1,7 +1,10 @@
 **/.DS_Store
 **/*/__pycache__/
 __pycache__
+
+# secrets
 *.env
+init/connections.yaml
 
 # Exported reuirements, better to export locally
 requirements.txt

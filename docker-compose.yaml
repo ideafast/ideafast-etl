@@ -50,7 +50,7 @@ x-airflow-common:
     AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
     AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://airflow:airflow@postgres/airflow
     AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
-    AIRFLOW__CORE__FERNET_KEY: ''
+    AIRFLOW__CORE__FERNET_KEY: ${_AIRFLOW__CORE__FERNET_KEY}
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__API__AUTH_BACKEND: 'airflow.api.auth.backend.basic_auth'
@@ -116,11 +116,7 @@ services:
 
   airflow-webserver:
     <<: *airflow-common
-    command: >
-      bash -c "
-      airflow pools import init/pools.json &&
-      airflow webserver
-      "
+    command: webserver
     ports:
       - 8080:8080
     healthcheck:
@@ -272,6 +268,24 @@ services:
       - bash
       - -c
       - airflow
+
+  ideafast-init:
+    # initialise pools, connections, variables for first time setup
+    # pools disregards changes in the UI, var and connections do not
+    # update if already exists
+    <<: *airflow-common
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+    volumes:
+      - ./init:/opt/airflow/init/
+    command:
+      - bash
+      - -c
+      - |
+        airflow pools import init/pools.json
+        airflow connections import init/connections.yaml
 
   flower:
     <<: *airflow-common

@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterator, Optional, Tuple
 
 import jwt
 import requests
@@ -83,7 +83,7 @@ class DreemJwtHook(BaseHook):
         finally:
             session.close()
 
-        return self._extras.get("token")
+        return self._extras.get("jwt")
 
     def get_conn(self) -> requests.Session:
         """
@@ -126,18 +126,16 @@ class DreemJwtHook(BaseHook):
 
     # API methods:
 
-    def get_metadata(self, list_size: int = 30) -> List[dict]:
+    def get_metadata(self, list_size: int = 30) -> Iterator[dict]:
         """
         GET all records (metadata) associated with the study site account
         This request is paginated and runs in multiple loops
 
         Parameters
         ----------
-        limit : bool
-
         list_size : int
-            Size of the number of recordings to fetch from the API. Defaults
-            to Dreem's default of 30
+            Size of the number of recordings to fetch from the API with each call
+            Defaults to Dreem's default of 30
         """
         session = self.get_conn()
 
@@ -147,8 +145,6 @@ class DreemJwtHook(BaseHook):
             + f"/record/?limit={list_size}"
         )
 
-        results = []
-
         # url is None when pagination ends available
         while url:
             response = session.get(url)
@@ -156,6 +152,4 @@ class DreemJwtHook(BaseHook):
             response.raise_for_status()
             result: dict = response.json()
             url = result.get("next")
-            results.extend(result.get("results"))
-
-        return results
+            yield from result.get("results")

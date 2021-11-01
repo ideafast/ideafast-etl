@@ -1,7 +1,9 @@
+import hashlib
+import warnings
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Set
 
 from airflow.providers.mongo.hooks.mongo import MongoHook
 from bson import ObjectId
@@ -41,6 +43,13 @@ class Record:
     patient_id: Optional[str] = None
     dmp_id: Optional[str] = None
 
+    @staticmethod
+    def generate_hash(input: str, device_type: DeviceType) -> str:
+        result = hashlib.sha256()
+        result.update(device_type.name.encode("utf-8"))
+        result.update(input.encode("utf-8"))
+        return result.hexdigest()
+
 
 def create_record(record: Record) -> ObjectId:
     """Insert one record into the DB, return the ID"""
@@ -67,6 +76,17 @@ def update_record(record: Record) -> bool:
         return result.modified_count == 1
 
 
+def __delete_record(record_id: str) -> bool:
+    """Delete one record from the DB using its ID"""
+    warnings.warn("Never use this method within the pipeline", UserWarning)
+
+    with MongoHook() as db:
+        result = db.delete_one(
+            **DEFAULTS, query={"_id": ObjectId(record_id)}, find_one=True
+        )
+        return result.deleted_count == 1
+
+
 def _get_records(filter: dict) -> List[Record]:
     """Get all (full) records with given filter"""
     with MongoHook() as db:
@@ -91,10 +111,10 @@ def get_unprocessed_records(device_type: DeviceType) -> List[Record]:
     return _get_records(filter={"device_type": device_type.value, "dmp_id": None})
 
 
-def get_list_of_hashes(device_type: DeviceType) -> List[str]:
+def get_hashes(device_type: DeviceType) -> Set[str]:
     """Get all hash representations of stored files"""
     with MongoHook() as db:
         result = db.find(
             **DEFAULTS, query={"device_type": device_type.value}, projection=["hash"]
         )
-        return [r["hash"] for r in result]
+        return {r["hash"] for r in result}

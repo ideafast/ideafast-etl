@@ -3,6 +3,7 @@ from datetime import datetime
 from airflow import DAG
 from airflow.operators.dummy import DummyOperator
 from airflow.operators.python import PythonOperator
+from etl_utils.db import DeviceType, Record, get_hashes
 from etl_utils.hooks.drm import DreemJwtHook
 
 # DAG setup with tasks
@@ -17,14 +18,20 @@ with DAG(
 
     def _download_latest_dreem_metadata() -> None:
         with DreemJwtHook(conn_id="dreem_kiel") as api:
-            result = api.get_metadata()
-            print(result)
+            # get all results
+            result = [r for r in api.get_metadata()]
+
+            # create hashes of found records, deduct with known records
+            all_records = {
+                Record.generate_hash(r["id"], DeviceType.DRM) for r in result
+            }
+            new_records = all_records - get_hashes(DeviceType.DRM)
+            print(new_records)
 
     # Set all tasks
     download_latest_dreem_metadata = PythonOperator(
         task_id="download_latest_dreem_metadata",
         python_callable=_download_latest_dreem_metadata,
-        default_args={"owner": "airflow"},
     )
     resolve_device_ids = DummyOperator(task_id="resolve_device_ids")
     resolve_patient_ids = DummyOperator(task_id="resolve_patient_ids")

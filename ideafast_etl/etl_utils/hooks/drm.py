@@ -19,14 +19,17 @@ class DreemJwtHook(BaseHook):
     """
 
     def __init__(self, conn_id: str, retry: int = 3) -> None:
-        # don't create the hook here, as constructors are more frequently
-        # called (in parsing DAGS) compared to using the hook with get_conn
+        """
+        Constructor. Does'nt initialise the Hook, as constructors
+        are more frequently called (in parsing DAGS)
+        """
+
         super().__init__()
         self._conn_id = conn_id
         self._retry = retry
 
         self._session: Optional[requests.Session] = None
-        self._base_url = None
+        self._base_url = ""
         self._extras: Dict[str, str] = {}
         self._login: Optional[Tuple[str, str]] = None
 
@@ -36,12 +39,11 @@ class DreemJwtHook(BaseHook):
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         self.close()
 
-    def get_jwt_token(self) -> str:
+    def _get_jwt_token(self) -> str:
         """
-        Check's the current token and refreses it if needed.
-        Updates the connection details in 'extras' if changed
+        Return's the latest JWT token, refreshes it if needed
+        Updates the connection details in 'extras' if changed for reuse across tasks
         """
-
         current_jwt = self._extras.get("jwt")
 
         if current_jwt:
@@ -51,18 +53,21 @@ class DreemJwtHook(BaseHook):
                     current_jwt,
                     options={"verify_signature": False, "verify_exp": True},
                 )
-                # not expired - ready to use
                 return current_jwt
             except jwt.ExpiredSignatureError:
                 pass
 
+        # if expired (thown and passed exception), or no token - fetch one
         response = requests.post(
             self._extras.get("token_host"), data={}, auth=self._login
         )
         response.raise_for_status()
-        token: str = response.json().get("token")
-        user_id: str = response.json().get("user_id")
-        self._extras.update({"jwt": token, "user_id": user_id})
+        self._extras.update(
+            {
+                "jwt": response.json().get("token"),
+                "user_id": response.json().get("user_id"),  # needed for Dreem API
+            }
+        )
 
         # update Airflow connection to reflect change
         session = settings.Session()
@@ -78,9 +83,9 @@ class DreemJwtHook(BaseHook):
         finally:
             session.close()
 
-        return token
+        return self._extras.get("token")
 
-    def get_conn(self) -> Tuple[requests.Session, str]:
+    def get_conn(self) -> requests.Session:
         """
         Returns the connection used by the hook for querying data.
         Should in principle not be used directly.
@@ -102,12 +107,12 @@ class DreemJwtHook(BaseHook):
         # return existing session, else create
         self._session = requests.Session() if self._session is None else self._session
 
-        # get latest (or new) JWT token
+        # ensure working JWT token
         self._session.headers.update(
-            {"Authorization": f"Bearer {self.get_jwt_token()}"}
+            {"Authorization": f"Bearer {self._get_jwt_token()}"}
         )
 
-        return self._session, self._base_url
+        return self._session
 
     def close(self) -> None:
         """Closes any active session."""
@@ -121,17 +126,25 @@ class DreemJwtHook(BaseHook):
 
     # API methods:
 
-    def get_metadata(self) -> List[dict]:
+    def get_metadata(self, list_size: int = 30) -> List[dict]:
         """
         GET all records (metadata) associated with the study site account
         This request is paginated and runs in multiple loops
+
+        Parameters
+        ----------
+        limit : bool
+
+        list_size : int
+            Size of the number of recordings to fetch from the API. Defaults
+            to Dreem's default of 30
         """
-        session, base_url = self.get_conn()
-        print(base_url)
-        print(self._extras)
+        session = self.get_conn()
+
         url = (
-            base_url
-            + f"dreem/algorythm/restricted_list/{self._extras.get('user_id')}/record/"
+            self._base_url
+            + f"dreem/algorythm/restricted_list/{self._extras.get('user_id')}"
+            + f"/record/?limit={list_size}"
         )
 
         results = []
@@ -139,6 +152,7 @@ class DreemJwtHook(BaseHook):
         # url is None when pagination ends available
         while url:
             response = session.get(url)
+            print(response.request.headers)
             response.raise_for_status()
             result: dict = response.json()
             url = result.get("next")

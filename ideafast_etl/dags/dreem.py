@@ -32,6 +32,17 @@ with DAG(
         task_id="extract_prep_load",
         # uses a task pool to limit local storage
         pool="down_upload_pool",
+        # - sort
+        # - groupby device
+        # - group by participant
+        # - group by day
+        # create folder
+        # download into that folder
+        # zip
+        # upload
+        # update record
+        # remove folder
+        # if fail, still remove folder
     )
 
     # Set dependencies between the static tasks

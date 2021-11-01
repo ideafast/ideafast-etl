@@ -120,7 +120,7 @@ class DreemJwtHook(BaseHook):
             self._session.close()
 
         self._session = None
-        self._base_url = None
+        self._base_url = ""
         self._extras = {}
         self._login = None
 

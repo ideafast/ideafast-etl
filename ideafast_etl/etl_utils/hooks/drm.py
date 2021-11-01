@@ -1,3 +1,4 @@
+import json
 from typing import Any, Dict, List, Optional, Tuple
 
 import jwt
@@ -55,7 +56,6 @@ class DreemJwtHook(BaseHook):
             except jwt.ExpiredSignatureError:
                 pass
 
-        # either expired or not present, request a new one
         response = requests.post(
             self._extras.get("token_host"), data={}, auth=self._login
         )
@@ -72,7 +72,8 @@ class DreemJwtHook(BaseHook):
                 .filter(Connection.conn_id == self._conn_id)
                 .one()
             )
-            connection.extra = self._extras
+            # use json.dumps for double quotes "" (needed for Airflow)
+            connection.extra = json.dumps(self._extras)
             session.commit()
         finally:
             session.close()
@@ -96,6 +97,7 @@ class DreemJwtHook(BaseHook):
                 )
 
             self._login = (config.login, config.password)
+            self._base_url = config.host
 
         # return existing session, else create
         self._session = requests.Session() if self._session is None else self._session
@@ -125,9 +127,11 @@ class DreemJwtHook(BaseHook):
         This request is paginated and runs in multiple loops
         """
         session, base_url = self.get_conn()
+        print(base_url)
+        print(self._extras)
         url = (
             base_url
-            + f"/dreem/algorythm/restricted_list/{self._extras.get('user_id')}/record/"
+            + f"dreem/algorythm/restricted_list/{self._extras.get('user_id')}/record/"
         )
 
         results = []

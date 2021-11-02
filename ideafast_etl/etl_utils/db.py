@@ -39,6 +39,7 @@ class Record:
     end: datetime
     meta: dict = field(default_factory=dict)  # additional details if needed
 
+    device_serial: Optional[str] = None
     device_id: Optional[str] = None
     patient_id: Optional[str] = None
     dmp_id: Optional[str] = None
@@ -93,6 +94,17 @@ def update_record(record: Record) -> bool:
         return result.modified_count == 1
 
 
+def update_many_drm_serials(uid: str, serial: str) -> int:
+    """Update many DRM record's device_serials upon resolving a DRM uid"""
+    with MongoHook() as db:
+        result = db.update_many(
+            **DEFAULTS,
+            filter_doc={"meta.dreem_uid": uid},
+            update_doc={"$set": {"device_serial": serial}},
+        )
+        return result.modified_count
+
+
 def __delete_record(record_id: str) -> bool:
     """Delete one record from the DB using its ID"""
     warnings.warn("Never use this method within the pipeline", UserWarning)
@@ -111,11 +123,39 @@ def _get_records(filter: dict) -> Generator[Record, None, None]:
         yield from (Record(**r) for r in result)
 
 
-def get_unresolved_device_records(
+def get_unresolved_device_serial_records(
+    device_type: DeviceType,
+) -> Generator[Record, None, None]:
+    """Get all records from a specific devicetype without device IDs"""
+    yield from _get_records(
+        filter={"device_type": device_type.name, "device_serial": None}
+    )
+
+
+def get_unresolved_device_id_records(
     device_type: DeviceType,
 ) -> Generator[Record, None, None]:
     """Get all records from a specific devicetype without device IDs"""
     yield from _get_records(filter={"device_type": device_type.name, "device_id": None})
+
+
+def get_unresolved_device_serials(
+    device_type: DeviceType,
+) -> Generator[str, None, None]:
+    """Helper method to get a reduced but full set of unique device serials to resolve"""
+    yield from (
+        serial
+        for record in get_unresolved_device_id_records(device_type)
+        if (serial := record.device_serial) is not None
+    )
+
+
+def get_unresolved_dreem_uids() -> Generator[str, None, None]:
+    """Helper method to get a reduced but full set of unique dreem uids to resolve"""
+    yield from (
+        record.meta.get("dreem_uid")
+        for record in get_unresolved_device_serial_records(DeviceType.DRM)
+    )
 
 
 def get_unresolved_patient_records(

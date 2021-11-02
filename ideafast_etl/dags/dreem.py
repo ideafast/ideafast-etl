@@ -6,7 +6,8 @@ from typing import Optional
 from airflow import DAG
 from airflow.operators.dummy import DummyOperator
 from airflow.operators.python import PythonOperator
-from etl_utils.db import DeviceType, Record, create_many_records, get_hashes
+from etl_utils import db, ucam
+from etl_utils.db import DeviceType, Record
 from etl_utils.hooks.drm import DreemJwtHook
 
 # DAG setup with tasks
@@ -34,7 +35,7 @@ with DAG(
             # get all results
             result = [r for r in api.get_metadata()]
             # create hashes of found records, deduct with known records
-            known = get_hashes(DeviceType.DRM)
+            known = db.get_hashes(DeviceType.DRM)
 
             # generator for new unknown records
             new_record_gen = (
@@ -45,13 +46,14 @@ with DAG(
                     device_type=DeviceType.DRM,
                     start=datetime.fromtimestamp(r["report"]["start_time"]),
                     end=datetime.fromtimestamp(r["report"]["stop_time"]),
+                    meta=dict(dreem_uid=r["device"]),
                 )
                 for r in result
                 if (hash := Record.generate_hash(r["id"], DeviceType.DRM)) not in known
             )
 
             new_records = list(islice(new_record_gen, limit))
-            new_ids = create_many_records(new_records) if new_records else []
+            new_ids = db.create_many_records(new_records) if new_records else []
 
             # Logging
             logging.info(f"{len(result)} Dreem records found on the server")
@@ -59,14 +61,68 @@ with DAG(
                 f"{len(new_ids)} new Dreem records added to the DB (limit was {limit})"
             )
 
+    def _resolve_device_serials(limit: Optional[int] = None) -> None:
+        """
+        Retrieve records with unknown device serials, and try to resolve them
+
+        NOTE
+        ----
+        Requires agreement with Dreem how to map Dreem uid to serials
+
+        Parameters
+        ----------
+        limit : None | int
+            limit of how many device serials to handle this run - useful for testing
+            or managing workload in batches
+        """
+        unresolved_dreem_uids = list(islice(db.get_unresolved_dreem_uids(), limit))
+        resolved_dreem_uids = {}
+
+        for uid in unresolved_dreem_uids:
+            resolved = ucam.dreem_uid_to_serial(uid)
+
+            if resolved:
+                resolved_dreem_uids[uid] = resolved
+
+        records_updated = [
+            db.update_many_drm_serials(uid, serial)
+            for uid, serial in resolved_dreem_uids.items()
+        ]
+
+        # Logging
+        logging.info(
+            f"{len(unresolved_dreem_uids)} records with unresolved device uid were collected"
+            + "from the DB (limit was {limit})"
+        )
+        logging.info(f"{len(resolved_dreem_uids)} uids were resolved into serials")
+        logging.info(
+            f"{sum(records_updated)} records in the DB were updated with the resolved serials"
+        )
+
+    def _resolve_device_ids() -> None:
+        pass
+
     # Set all tasks
     download_latest_dreem_metadata = PythonOperator(
         task_id="download_latest_dreem_metadata",
         python_callable=_download_latest_dreem_metadata,
         op_kwargs={"limit": 1},
     )
-    resolve_device_ids = DummyOperator(task_id="resolve_device_ids")
+
+    resolve_device_serials = PythonOperator(
+        task_id="resolve_device_serials",
+        python_callable=_resolve_device_serials,
+        op_kwargs={"limit": 1},
+    )
+
+    resolve_device_ids = PythonOperator(
+        task_id="resolve_device_ids",
+        python_callable=_resolve_device_ids,
+        op_kwargs={"limit": 1},
+    )
+
     resolve_patient_ids = DummyOperator(task_id="resolve_patient_ids")
+
     extract_prep_load = DummyOperator(
         task_id="extract_prep_load",
         # uses a task pool to limit local storage
@@ -88,6 +144,7 @@ with DAG(
 
     (
         download_latest_dreem_metadata
+        >> resolve_device_serials
         >> resolve_device_ids
         >> resolve_patient_ids
         >> extract_prep_load

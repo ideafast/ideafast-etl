@@ -6,6 +6,10 @@ __pycache__
 *.env
 init/connections.yaml
 
+# local files for development
+ideafast_etl/etl_utils/dummy/*
+!.gitkeep
+
 # Exported reuirements, better to export locally
 requirements.txt
 

@@ -1,9 +1,12 @@
+import logging
 from datetime import datetime
+from itertools import islice
+from typing import Optional
 
 from airflow import DAG
 from airflow.operators.dummy import DummyOperator
 from airflow.operators.python import PythonOperator
-from etl_utils.db import DeviceType, Record, get_hashes
+from etl_utils.db import DeviceType, Record, create_many_records, get_hashes
 from etl_utils.hooks.drm import DreemJwtHook
 
 # DAG setup with tasks
@@ -14,24 +17,53 @@ with DAG(
     start_date=datetime(year=2019, month=11, day=1),
     schedule_interval=None,
     catchup=False,
+    render_template_as_native_obj=True,
 ) as dag:
 
-    def _download_latest_dreem_metadata() -> None:
+    def _download_latest_dreem_metadata(limit: Optional[int] = None) -> None:
+        """
+        Retrieve records on Dreem's servers, filters only the new
+
+        Parameters
+        ----------
+        limit : None | int
+            limit of how many records to handle this run - useful for testing
+            or managing workload in batches
+        """
         with DreemJwtHook(conn_id="dreem_kiel") as api:
             # get all results
             result = [r for r in api.get_metadata()]
-
             # create hashes of found records, deduct with known records
-            all_records = {
-                Record.generate_hash(r["id"], DeviceType.DRM) for r in result
-            }
-            new_records = all_records - get_hashes(DeviceType.DRM)
-            print(new_records)
+            known = get_hashes(DeviceType.DRM)
+
+            # generator for new unknown records
+            new_record_gen = (
+                Record(
+                    _id=None,
+                    hash=hash,
+                    manufacturer_ref=r["id"],
+                    device_type=DeviceType.DRM,
+                    start=datetime.fromtimestamp(r["report"]["start_time"]),
+                    end=datetime.fromtimestamp(r["report"]["stop_time"]),
+                )
+                for r in result
+                if (hash := Record.generate_hash(r["id"], DeviceType.DRM)) not in known
+            )
+
+            new_records = list(islice(new_record_gen, limit))
+            new_ids = create_many_records(new_records) if new_records else []
+
+            # Logging
+            logging.info(f"{len(result)} Dreem records found on the server")
+            logging.info(
+                f"{len(new_ids)} new Dreem records added to the DB (limit was {limit})"
+            )
 
     # Set all tasks
     download_latest_dreem_metadata = PythonOperator(
         task_id="download_latest_dreem_metadata",
         python_callable=_download_latest_dreem_metadata,
+        op_kwargs={"limit": 1},
     )
     resolve_device_ids = DummyOperator(task_id="resolve_device_ids")
     resolve_patient_ids = DummyOperator(task_id="resolve_patient_ids")

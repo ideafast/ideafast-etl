@@ -148,7 +148,6 @@ class DreemJwtHook(BaseHook):
         # url is None when pagination ends available
         while url:
             response = session.get(url)
-            print(response.request.headers)
             response.raise_for_status()
             result: dict = response.json()
             url = result.get("next")

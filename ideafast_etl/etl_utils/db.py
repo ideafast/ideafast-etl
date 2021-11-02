@@ -34,9 +34,9 @@ class Record:
     _id: Optional[ObjectId]
     hash: str
     manufacturer_ref: str
-    device_type: str
-    start_wear: datetime
-    end_wear: datetime
+    device_type: DeviceType
+    start: datetime
+    end: datetime
     meta: dict = field(default_factory=dict)  # additional details if needed
 
     device_id: Optional[str] = None
@@ -45,17 +45,34 @@ class Record:
 
     @staticmethod
     def generate_hash(input: str, device_type: DeviceType) -> str:
+        """Generate a unique hash for DB comparison across devices"""
         result = hashlib.sha256()
         result.update(device_type.name.encode("utf-8"))
         result.update(input.encode("utf-8"))
         return result.hexdigest()
 
+    def as_db_dict(self) -> dict:
+        """Converts the dataclass to dict for inserting into MongoDB"""
+        result = asdict(self)
+        result.pop("_id")
+        result.update(device_type=self.device_type.name)
+        return result
+
 
 def create_record(record: Record) -> ObjectId:
     """Insert one record into the DB, return the ID"""
     with MongoHook() as db:
-        result = db.insert_one(**DEFAULTS, doc=asdict(record))
+        result = db.insert_one(**DEFAULTS, doc=record.as_db_dict())
         return result.inserted_id
+
+
+def create_many_records(records: List[Record]) -> List[ObjectId]:
+    """Insert multiple records into the DB, return the ID"""
+    with MongoHook() as db:
+        result = db.insert_many(
+            **DEFAULTS, docs=[r.as_db_dict() for r in records], ordered=False
+        )
+        return result.inserted_ids
 
 
 def read_record(record_id: str) -> Record:
@@ -71,7 +88,7 @@ def update_record(record: Record) -> bool:
         result = db.update_one(
             **DEFAULTS,
             filter_doc={"_id": record._id},
-            update_doc={"$set": asdict(record)},
+            update_doc={"$set": record.as_db_dict()},
         )
         return result.modified_count == 1
 
@@ -96,25 +113,25 @@ def _get_records(filter: dict) -> List[Record]:
 
 def get_unresolved_device_records(device_type: DeviceType) -> List[Record]:
     """Get all records from a specific devicetype without device IDs"""
-    return _get_records(filter={"device_type": device_type.value, "device_id": None})
+    return _get_records(filter={"device_type": device_type.name, "device_id": None})
 
 
 def get_unresolved_patient_records(device_type: DeviceType) -> List[Record]:
     """Get all records from a specific devicetype without patient IDs"""
-    return _get_records(filter={"device_type": device_type.value, "patient_id": None})
+    return _get_records(filter={"device_type": device_type.name, "patient_id": None})
 
 
 def get_unprocessed_records(device_type: DeviceType) -> List[Record]:
     """
     Get all records from a specific device type that have not been downloaded
     and uploaded to the DMP yet"""
-    return _get_records(filter={"device_type": device_type.value, "dmp_id": None})
+    return _get_records(filter={"device_type": device_type.name, "dmp_id": None})
 
 
 def get_hashes(device_type: DeviceType) -> Set[str]:
     """Get all hash representations of stored files"""
     with MongoHook() as db:
         result = db.find(
-            **DEFAULTS, query={"device_type": device_type.value}, projection=["hash"]
+            **DEFAULTS, query={"device_type": device_type.name}, projection=["hash"]
         )
         return {r["hash"] for r in result}

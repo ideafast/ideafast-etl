@@ -3,7 +3,7 @@ import warnings
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional, Set
+from typing import Generator, List, Optional, Set
 
 from airflow.providers.mongo.hooks.mongo import MongoHook
 from bson import ObjectId
@@ -104,28 +104,34 @@ def __delete_record(record_id: str) -> bool:
         return result.deleted_count == 1
 
 
-def _get_records(filter: dict) -> List[Record]:
+def _get_records(filter: dict) -> Generator[Record, None, None]:
     """Get all (full) records with given filter"""
     with MongoHook() as db:
         result = db.find(**DEFAULTS, query=filter)
-        return [Record(**r) for r in result]
+        yield from (Record(**r) for r in result)
 
 
-def get_unresolved_device_records(device_type: DeviceType) -> List[Record]:
+def get_unresolved_device_records(
+    device_type: DeviceType,
+) -> Generator[Record, None, None]:
     """Get all records from a specific devicetype without device IDs"""
-    return _get_records(filter={"device_type": device_type.name, "device_id": None})
+    yield from _get_records(filter={"device_type": device_type.name, "device_id": None})
 
 
-def get_unresolved_patient_records(device_type: DeviceType) -> List[Record]:
+def get_unresolved_patient_records(
+    device_type: DeviceType,
+) -> Generator[Record, None, None]:
     """Get all records from a specific devicetype without patient IDs"""
-    return _get_records(filter={"device_type": device_type.name, "patient_id": None})
+    yield from _get_records(
+        filter={"device_type": device_type.name, "patient_id": None}
+    )
 
 
-def get_unprocessed_records(device_type: DeviceType) -> List[Record]:
+def get_unprocessed_records(device_type: DeviceType) -> Generator[Record, None, None]:
     """
     Get all records from a specific device type that have not been downloaded
     and uploaded to the DMP yet"""
-    return _get_records(filter={"device_type": device_type.name, "dmp_id": None})
+    yield from _get_records(filter={"device_type": device_type.name, "dmp_id": None})
 
 
 def get_hashes(device_type: DeviceType) -> Set[str]:

@@ -1,6 +1,6 @@
 import hashlib
 import warnings
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from enum import Enum
 from typing import List, Optional, Set
@@ -37,7 +37,6 @@ class Record:
     device_type: DeviceType
     start: datetime
     end: datetime
-    meta: dict = field(default_factory=dict)  # additional details if needed
 
     device_id: Optional[str] = None
     patient_id: Optional[str] = None
@@ -57,6 +56,17 @@ class Record:
         result.pop("_id")
         result.update(device_type=self.device_type.name)
         return result
+
+
+@dataclass
+class DreemVariation:
+    device_serial: str
+    download_url: str
+
+
+@dataclass
+class DreemRecord(Record, DreemVariation):
+    pass
 
 
 def create_record(record: Record) -> ObjectId:

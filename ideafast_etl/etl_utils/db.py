@@ -53,7 +53,7 @@ class Record:
         return result.hexdigest()
 
     def as_db_dict(self) -> dict:
-        """Converts the dataclass to dict for inserting into MongoDB"""
+        """Convert the dataclass to dict for inserting into MongoDB"""
         result = asdict(self)
         result.pop("_id")
         result.update(device_type=self.device_type.name)
@@ -95,12 +95,43 @@ def update_record(record: Record) -> bool:
 
 
 def update_many_drm_serials(uid: str, serial: str) -> int:
-    """Update many DRM record's device_serials upon resolving a DRM uid"""
+    """
+    Update many DRM record's device_serials upon resolving a DRM uid
+
+    Note
+    ----
+    Currently ignores records that already had a serial set to avoid overrides
+    """
     with MongoHook() as db:
         result = db.update_many(
             **DEFAULTS,
-            filter_doc={"meta.dreem_uid": uid},
+            filter_doc={
+                "device_type": DeviceType.DRM.name,
+                "meta.dreem_uid": uid,
+                "device_serial": None,
+            },
             update_doc={"$set": {"device_serial": serial}},
+        )
+        return result.modified_count
+
+
+def update_many_device_ids(serial: str, device_id: str, device_type: DeviceType) -> int:
+    """
+    Update many record's device_ids upon resolving the device_serials
+
+    Note
+    ----
+    Currently ignores records that already had a device_id set to avoid overrides
+    """
+    with MongoHook() as db:
+        result = db.update_many(
+            **DEFAULTS,
+            filter_doc={
+                "device_type": device_type.name,
+                "device_serial": serial,
+                "device_id": None,
+            },
+            update_doc={"$set": {"device_id": device_id}},
         )
         return result.modified_count
 
@@ -123,16 +154,16 @@ def _get_records(filter: dict) -> Generator[Record, None, None]:
         yield from (Record(**r) for r in result)
 
 
-def get_unresolved_device_serial_records(
+def _get_unresolved_device_serial_records(
     device_type: DeviceType,
 ) -> Generator[Record, None, None]:
-    """Get all records from a specific devicetype without device IDs"""
+    """Get all records from a specific devicetype without device serials"""
     yield from _get_records(
         filter={"device_type": device_type.name, "device_serial": None}
     )
 
 
-def get_unresolved_device_id_records(
+def _get_unresolved_device_id_records(
     device_type: DeviceType,
 ) -> Generator[Record, None, None]:
     """Get all records from a specific devicetype without device IDs"""
@@ -142,20 +173,21 @@ def get_unresolved_device_id_records(
 def get_unresolved_device_serials(
     device_type: DeviceType,
 ) -> Generator[str, None, None]:
-    """Helper method to get a reduced but full set of unique device serials to resolve"""
-    yield from (
-        serial
-        for record in get_unresolved_device_id_records(device_type)
-        if (serial := record.device_serial) is not None
-    )
+    """Retrieve a reduced but full set of unique device serials to resolve"""
+    seen = set()
+    for record in _get_unresolved_device_id_records(device_type):
+        if (serial := record.device_serial) and serial not in seen:
+            yield serial
+            seen.add(serial)
 
 
 def get_unresolved_dreem_uids() -> Generator[str, None, None]:
-    """Helper method to get a reduced but full set of unique dreem uids to resolve"""
-    yield from (
-        record.meta.get("dreem_uid")
-        for record in get_unresolved_device_serial_records(DeviceType.DRM)
-    )
+    """Retrieve a reduced but full set of unique dreem uids to resolve"""
+    seen = set()
+    for record in _get_unresolved_device_serial_records(DeviceType.DRM):
+        if (uid := record.meta.get("dreem_uid")) not in seen:
+            yield uid
+            seen.add(uid)
 
 
 def get_unresolved_patient_records(
@@ -168,9 +200,7 @@ def get_unresolved_patient_records(
 
 
 def get_unprocessed_records(device_type: DeviceType) -> Generator[Record, None, None]:
-    """
-    Get all records from a specific device type that have not been downloaded
-    and uploaded to the DMP yet"""
+    """Get all records from a specific device type that have not been down/uploaded yet"""
     yield from _get_records(filter={"device_type": device_type.name, "dmp_id": None})
 
 

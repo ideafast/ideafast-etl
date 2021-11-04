@@ -10,9 +10,9 @@ CURRENT_DIR = Path(__file__).parent
 def _csv_as_dict(path: Path) -> Dict[str, str]:
     """
     Load full CSV as dict into memory for quick lookup.
+
     Assumes csv rows are unique
     """
-
     with open(path, mode="r") as file:
         data = {rows[0]: rows[1] for rows in csv.reader(file)}
 
@@ -22,7 +22,7 @@ def _csv_as_dict(path: Path) -> Dict[str, str]:
 @lru_cache
 def dreem_uid_to_serial(device_uid: str) -> Optional[str]:
     """
-    Resolves a Dreem device UID to a device serial
+    Resolve a Dreem device UID to a device serial
 
     NOTE
     ----
@@ -42,7 +42,7 @@ def dreem_uid_to_serial(device_uid: str) -> Optional[str]:
 @lru_cache
 def serial_to_id(serial: str) -> Optional[str]:
     """
-    Resolves any device serial to an IDEA-FAST device ID
+    Resolve any device serial to an IDEA-FAST device ID
 
     NOTE
     ----

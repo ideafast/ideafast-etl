@@ -19,11 +19,7 @@ class DreemJwtHook(BaseHook):
     """
 
     def __init__(self, conn_id: str, retry: int = 3) -> None:
-        """
-        Constructor. Does'nt initialise the Hook, as constructors
-        are more frequently called (in parsing DAGS)
-        """
-
+        """Construct, but not initialise, the Hook."""
         super().__init__()
         self._conn_id = conn_id
         self._retry = retry
@@ -34,14 +30,17 @@ class DreemJwtHook(BaseHook):
         self._login: Optional[Tuple[str, str]] = None
 
     def __enter__(self) -> BaseHook:
+        """Return the Hook when used in context management"""
         return self
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Close the Hook when used in context management"""
         self.close()
 
     def _get_jwt_token(self) -> str:
         """
-        Return's the latest JWT token, refreshes it if needed
+        Return the latest JWT token, refreshes it if needed
+
         Updates the connection details in 'extras' if changed for reuse across tasks
         """
         current_jwt = self._extras.get("jwt")
@@ -87,10 +86,10 @@ class DreemJwtHook(BaseHook):
 
     def get_conn(self) -> requests.Session:
         """
-        Returns the connection used by the hook for querying data.
+        Get the connection used by the hook for querying data.
+
         Should in principle not be used directly.
         """
-
         # get initial details from Airflow Connections is no session exists
         if self._session is None:
             config = self.get_connection(self._conn_id)
@@ -115,7 +114,7 @@ class DreemJwtHook(BaseHook):
         return self._session
 
     def close(self) -> None:
-        """Closes any active session."""
+        """Close any active session."""
         if self._session:
             self._session.close()
 
@@ -129,6 +128,7 @@ class DreemJwtHook(BaseHook):
     def get_metadata(self, list_size: int = 30) -> Iterator[dict]:
         """
         GET all records (metadata) associated with the study site account
+
         This request is paginated and runs in multiple loops
 
         Parameters

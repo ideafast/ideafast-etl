@@ -65,14 +65,14 @@ with DAG(
         """
         Retrieve records with unknown device serials, and try to resolve them
 
-        NOTE
+        Note
         ----
         Requires agreement with Dreem how to map Dreem uid to serials
 
         Parameters
         ----------
         limit : None | int
-            limit of how many device serials to handle this run - useful for testing
+            limit of how many device uids to handle this run - useful for testing
             or managing workload in batches
         """
         unresolved_dreem_uids = list(islice(db.get_unresolved_dreem_uids(), limit))
@@ -91,28 +91,67 @@ with DAG(
 
         # Logging
         logging.info(
-            f"{len(unresolved_dreem_uids)} records with unresolved device uid were collected"
-            + "from the DB (limit was {limit})"
+            f"{len(unresolved_dreem_uids)} unresolved device uids were collected"
+            + f"from the DB (limit was {limit})"
         )
         logging.info(f"{len(resolved_dreem_uids)} uids were resolved into serials")
         logging.info(
             f"{sum(records_updated)} records in the DB were updated with the resolved serials"
         )
 
-    def _resolve_device_ids() -> None:
-        pass
+    def _resolve_device_ids(limit: Optional[int] = None) -> None:
+        """
+        Retrieve records with unknown device IDs, and try to resolve them
+
+        Note
+        ----
+        Requires update once UCAM includes device serials
+
+        Parameters
+        ----------
+        limit : None | int
+            limit of how many device serials to handle this run - useful for testing
+            or managing workload in batches
+        """
+        unresolved_dreem_serials = list(
+            islice(db.get_unresolved_device_serials(DeviceType.DRM), limit)
+        )
+        resolved_dreem_serials = {}
+
+        for serial in unresolved_dreem_serials:
+            resolved = ucam.serial_to_id(serial)
+
+            if resolved:
+                resolved_dreem_serials[serial] = resolved
+
+        records_updated = [
+            db.update_many_device_ids(serial, device_id, DeviceType.DRM)
+            for serial, device_id in resolved_dreem_serials.items()
+        ]
+
+        # Logging
+        logging.info(
+            f"{len(unresolved_dreem_serials)} unresolved device_serials were collected"
+            + f"from the DB (limit was {limit})"
+        )
+        logging.info(
+            f"{len(resolved_dreem_serials)} serials were resolved into device_ids"
+        )
+        logging.info(
+            f"{sum(records_updated)} records in the DB were updated with the resolved serials"
+        )
 
     # Set all tasks
     download_latest_dreem_metadata = PythonOperator(
         task_id="download_latest_dreem_metadata",
         python_callable=_download_latest_dreem_metadata,
-        op_kwargs={"limit": 1},
+        op_kwargs={"limit": 10},
     )
 
     resolve_device_serials = PythonOperator(
         task_id="resolve_device_serials",
         python_callable=_resolve_device_serials,
-        op_kwargs={"limit": 1},
+        op_kwargs={"limit": 5},
     )
 
     resolve_device_ids = PythonOperator(

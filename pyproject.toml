@@ -25,6 +25,7 @@ coverage = {extras = ["toml"], version = "^6.0.2"}
 pytest-cov = "^3.0.0"
 nox = "^2021.10.1"
 nox-poetry = "^0.8.6"
+flake8-docstrings = "^1.6.0"
 
 [tool.poetry.scripts]
 build = "cli:build"

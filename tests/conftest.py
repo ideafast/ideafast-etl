@@ -10,10 +10,14 @@ PROJECT_DIR = Path(__file__).parent.parent
 
 
 class localise_utils:
+    """Context wrapper to replace local module reference"""
+
     def __enter__(self) -> None:
+        """Replace local referenced module"""
         sys.modules["etl_utils"] = importlib.import_module("ideafast_etl.etl_utils")
 
     def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> None:
+        """Delete replaced local module"""
         del sys.modules["etl_utils"]
 
 

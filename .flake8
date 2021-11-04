@@ -1,4 +1,23 @@
 [flake8]
-select = AAA,B,B9,BLK,C,E,F,I,S,W
-ignore = E203,E501,W503,S322,S309,I201,I100,I001,I005, S101, W293, AAA05, B902
+select = AAA,B,B9,BLK,C,E,F,I,S,W,D
+ignore = E203,E501,W503,S322,S309,I201,I100,I001,I005, S101, W293, AAA05, B902, D400, D104, D100
 max-line-length = 95
+docstring-convention=numpy
+exclude =
+    .github
+    .nox
+    .mypy_cache
+    .pytest_cache
+    __pycache__
+    .example
+    .env
+    .csv
+    .airflowignore
+    .gitignore
+    # secrets
+    connections.yaml
+    logs
+    plugins
+    .sh
+    .ini
+

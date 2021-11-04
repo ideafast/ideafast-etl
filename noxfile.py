@@ -9,6 +9,7 @@ LOCATIONS = "ideafast_etl", "tests", "noxfile.py"
 
 
 def install_with_constraints(session: nox.Session, *args: str, **kwargs: Any) -> None:
+    """Install requirements with constraints as defined by Poetry"""
     with tempfile.NamedTemporaryFile() as requirements:
         session.run(
             "poetry",
@@ -42,6 +43,7 @@ def lint(session: nox.Session) -> None:
         "flake8-bandit",
         "flake8-black",
         "flake8-bugbear",
+        "flake8-docstrings",
     )
     session.run("flake8", *args)
 
@@ -56,9 +58,7 @@ def mypy(session: nox.Session) -> None:
 
 @session(python=["3.8"])
 def black(session: nox.Session) -> None:
-    """Automatic format code following black codestyle:
-    https://github.com/psf/black.
-    """
+    """Automatic format code following black codestyle https://github.com/psf/black."""
     args = session.posargs or LOCATIONS
     session.install("black")
     session.run("black", *args)

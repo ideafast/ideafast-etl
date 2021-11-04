@@ -10,8 +10,9 @@ dreem_kiel:
   password: dreem_pass_kiel
   extra: |
     {
-      token_host: dreem_token_url
-      user_id: ""
+      "jwt_url": "",
+      "jwt_token_path": "dict.path.to.token",
+      "user_id": ""
     }
   port: null
   schema: null

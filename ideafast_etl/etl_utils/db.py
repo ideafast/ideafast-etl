@@ -193,9 +193,13 @@ def get_unresolved_dreem_uids() -> Generator[str, None, None]:
 def get_unresolved_patient_records(
     device_type: DeviceType,
 ) -> Generator[Record, None, None]:
-    """Get all records from a specific devicetype without patient IDs"""
+    """Get all records from a specific devicetype without patient_id, with device_id"""
     yield from _get_records(
-        filter={"device_type": device_type.name, "patient_id": None}
+        filter={
+            "device_type": device_type.name,
+            "device_id": {"$ne": "null"},
+            "patient_id": None,
+        }
     )
 
 

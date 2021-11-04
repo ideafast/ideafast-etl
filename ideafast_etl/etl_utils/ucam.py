@@ -19,7 +19,6 @@ def _csv_as_dict(path: Path) -> Dict[str, str]:
     return data
 
 
-@lru_cache
 def dreem_uid_to_serial(device_uid: str) -> Optional[str]:
     """
     Resolve a Dreem device UID to a device serial
@@ -39,7 +38,6 @@ def dreem_uid_to_serial(device_uid: str) -> Optional[str]:
     return data.get(device_uid)
 
 
-@lru_cache
 def serial_to_id(serial: str) -> Optional[str]:
     """
     Resolve any device serial to an IDEA-FAST device ID
@@ -56,3 +54,29 @@ def serial_to_id(serial: str) -> Optional[str]:
     """
     data = _csv_as_dict(CURRENT_DIR / "dummy/serial_to_id.csv")
     return data.get(serial)
+
+
+# def patient_by_wear_period(
+#     device_id: str, start_wear: datetime, end_wear: datetime
+# ) -> Optional[str]:
+#     """Resolve a device ID to a patient_id based on the assigned wear period"""
+#     start_wear = _normalise_day(start_wear)
+#     end_wear = _normalise_day(end_wear)
+#     devices = get_one_device(device_id)
+
+#     return determine_by_wear_period(devices, start_wear, end_wear)
+
+
+# def _normalise_day(_datetime: datetime) -> datetime:
+#     """Normalise a daytime to 00:00:00 for comparison"""
+#     return _datetime.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+# @lru_cache
+# def get_device(device_id: str) -> Optional[List[DeviceWithPatients]]:
+#     response = requests.get(f"{config.ucam_api}devices/{device_id}").json()
+#     return (
+#         [DeviceWithPatients.serialize(device) for device in response["data"]]
+#         if response["meta"]["success"]
+#         else None
+#     )

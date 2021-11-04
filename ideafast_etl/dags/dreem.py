@@ -141,17 +141,55 @@ with DAG(
             f"{sum(records_updated)} records in the DB were updated with the resolved serials"
         )
 
+    def _resolve_patient_ids(limit: Optional[int] = None) -> None:
+        """
+        Retrieve records with unknown patient IDs, and try to resolve them
+
+        Parameters
+        ----------
+        limit : None | int
+            limit of how many device serials to handle this run - useful for testing
+            or managing workload in batches
+        """
+        # unresolved_dreem_patients = list(
+        #     islice(db.get_unresolved_patient_records(DeviceType.DRM), limit)
+        # )
+
+        # with UcamJwtHook() as api:
+        #     for patient in unresolved_dreem_patients:
+        #         resolved = ucam.serial_to_id(serial)
+
+        #         if resolved:
+        #             resolved_dreem_serials[serial] = resolved
+
+        #     records_updated = [
+        #         db.update_many_device_ids(serial, device_id, DeviceType.DRM)
+        #         for serial, device_id in resolved_dreem_serials.items()
+        #     ]
+
+        # # Logging
+        # logging.info(
+        #     f"{len(unresolved_dreem_serials)} unresolved device_serials were collected"
+        #     + f"from the DB (limit was {limit})"
+        # )
+        # logging.info(
+        #     f"{len(resolved_dreem_serials)} serials were resolved into device_ids"
+        # )
+        # logging.info(
+        #     f"{sum(records_updated)} records in the DB were updated with the resolved serials"
+        # )
+
     # Set all tasks
     download_latest_dreem_metadata = PythonOperator(
         task_id="download_latest_dreem_metadata",
         python_callable=_download_latest_dreem_metadata,
-        op_kwargs={"limit": 10},
+        op_kwargs={"limit": 1},
     )
 
     resolve_device_serials = PythonOperator(
         task_id="resolve_device_serials",
         python_callable=_resolve_device_serials,
-        op_kwargs={"limit": 5},
+        op_kwargs={"limit": 1},
     )
 
     resolve_device_ids = PythonOperator(
@@ -160,7 +198,11 @@ with DAG(
         op_kwargs={"limit": 1},
     )
 
-    resolve_patient_ids = DummyOperator(task_id="resolve_patient_ids")
+    resolve_patient_ids = PythonOperator(
+        task_id="resolve_patient_ids",
+        python_callable=_resolve_patient_ids,
+        op_kwargs={"limit": 1},
+    )
 
     extract_prep_load = DummyOperator(
         task_id="extract_prep_load",

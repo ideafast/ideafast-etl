@@ -8,7 +8,8 @@ from airflow.operators.dummy import DummyOperator
 from airflow.operators.python import PythonOperator
 from etl_utils import db, ucam
 from etl_utils.db import DeviceType, Record
-from etl_utils.hooks.drm import DreemJwtHook
+from etl_utils.hooks.drm import DreemHook
+from etl_utils.hooks.ucam import UcamHook
 
 # DAG setup with tasks
 with DAG(
@@ -31,7 +32,7 @@ with DAG(
             limit of how many records to handle this run - useful for testing
             or managing workload in batches
         """
-        with DreemJwtHook(conn_id="dreem_kiel") as api:
+        with DreemHook(conn_id="dreem_kiel") as api:
             # get all results
             result = [r for r in api.get_metadata()]
             # create hashes of found records, deduct with known records
@@ -151,33 +152,30 @@ with DAG(
             limit of how many device serials to handle this run - useful for testing
             or managing workload in batches
         """
-        # unresolved_dreem_patients = list(
-        #     islice(db.get_unresolved_patient_records(DeviceType.DRM), limit)
-        # )
+        unresolved_dreem_patients = list(
+            islice(db.get_unresolved_patient_records(DeviceType.DRM), limit)
+        )
+        resolved_dreem_patients = 0
 
-        # with UcamJwtHook() as api:
-        #     for patient in unresolved_dreem_patients:
-        #         resolved = ucam.serial_to_id(serial)
+        with UcamHook() as api:
+            for patient in unresolved_dreem_patients:
+                resolved = api.resolve_patient_id(
+                    patient.device_id, patient.start, patient.end
+                )
 
-        #         if resolved:
-        #             resolved_dreem_serials[serial] = resolved
+                if resolved and db.update_record(
+                    patient._id, dict(patient_id=resolved)
+                ):
+                    resolved_dreem_patients += 1
 
-        #     records_updated = [
-        #         db.update_many_device_ids(serial, device_id, DeviceType.DRM)
-        #         for serial, device_id in resolved_dreem_serials.items()
-        #     ]
-
-        # # Logging
-        # logging.info(
-        #     f"{len(unresolved_dreem_serials)} unresolved device_serials were collected"
-        #     + f"from the DB (limit was {limit})"
-        # )
-        # logging.info(
-        #     f"{len(resolved_dreem_serials)} serials were resolved into device_ids"
-        # )
-        # logging.info(
-        #     f"{sum(records_updated)} records in the DB were updated with the resolved serials"
-        # )
+        # Logging
+        logging.info(
+            f"{len(unresolved_dreem_patients)} unresolved device_serials were collected"
+            + f" from the DB (limit was {limit})"
+        )
+        logging.info(
+            f"{resolved_dreem_patients} patient_ids were resolved and updated on the DB"
+        )
 
     # Set all tasks
     download_latest_dreem_metadata = PythonOperator(

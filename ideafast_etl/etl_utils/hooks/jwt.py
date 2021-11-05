@@ -22,13 +22,18 @@ class JwtHook(BaseHook):
     Stores a JWT token as 'jwt_token' in the connections.extras field.
     Retains other items in the connections.extras field as long as no overlap
 
+    By default, this hook retrieves a JWT token through basicAuth. If this
+    is different for your case, create a subclass and override the prepped_jwt_request.
+
     Parameters
     ----------
     conn_id : str
-        ID of the connection to use to connect to the Dreem API
+        ID of the connection to use to connect to the JWT HTTPS API
     """
 
-    def __init__(self, conn_id: str, retry: int = 3) -> None:
+    default_conn_name = "jwt_default"
+
+    def __init__(self, conn_id: str = default_conn_name, retry: int = 3) -> None:
         """Construct, but not initialise, the Hook."""
         super().__init__()
         self.conn_id = conn_id
@@ -54,6 +59,18 @@ class JwtHook(BaseHook):
         """Get the token from the jwt_payload following the dot notated path"""
         return str(reduce(getitem, jwt_path.split("."), jwt_payload))
 
+    def _jwt_prepared_request(self) -> requests.PreparedRequest:
+        """
+        Return a prepared JWT requests
+
+        Note
+        ----
+        Override this method if your JWT procedure is not a POST request with basic auth
+        """
+        return requests.Request(
+            "POST", self.jwt_url, auth=(self.user, self.passw)
+        ).prepare()
+
     def _get_jwt_token(self) -> str:
         """
         Return the latest JWT token, refreshes it if needed
@@ -72,7 +89,8 @@ class JwtHook(BaseHook):
                 pass
 
         # if expired (thown and passed exception), or no token - fetch one
-        response = requests.post(self.jwt_url, data={}, auth=(self.user, self.passw))
+        response = requests.Session().send(self._jwt_prepared_request())
+        print(response.request.body)
         response.raise_for_status()
         self.jwt_token = self._find_jwt_token(
             jwt_path=self.jwt_token_path, jwt_payload=response.json()

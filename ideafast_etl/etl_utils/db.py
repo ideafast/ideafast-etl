@@ -3,7 +3,7 @@ import warnings
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Generator, List, Optional, Set
+from typing import Any, Dict, Generator, List, Optional, Set
 
 from airflow.providers.mongo.hooks.mongo import MongoHook
 from bson import ObjectId
@@ -83,13 +83,13 @@ def read_record(record_id: str) -> Record:
         return Record(**result)
 
 
-def update_record(record: Record) -> bool:
-    """Update one record from the DB"""
+def update_record(record_id: ObjectId, changes: Dict[str, Any]) -> bool:
+    """Update one record from the DB with the given updates to do"""
     with MongoHook() as db:
         result = db.update_one(
             **DEFAULTS,
-            filter_doc={"_id": record._id},
-            update_doc={"$set": record.as_db_dict()},
+            filter_doc={"_id": record_id},
+            update_doc={"$set": changes},
         )
         return result.modified_count == 1
 

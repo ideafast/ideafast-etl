@@ -3,7 +3,7 @@ from typing import Iterator
 from etl_utils.hooks.jwt import JwtHook
 
 
-class DreemJwtHook(JwtHook):
+class DreemHook(JwtHook):
     """
     Hook for interfacing with the JWT REST APIs from Dreem
 

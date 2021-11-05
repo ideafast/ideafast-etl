@@ -10,9 +10,23 @@ dreem_kiel:
   password: dreem_pass_kiel
   extra: |
     {
-      "jwt_url": "",
+      "jwt_url": "https://url.for.token/",
       "jwt_token_path": "dict.path.to.token",
-      "user_id": ""
+      "user_id": "dreem_kiel_uid"
+    }
+  port: null
+  schema: null
+
+ucam_default:
+  conn_type: JWT
+  description: "Custom API connection with UCAM servers"
+  host: ucam_url_api
+  login: ucam_user
+  password: ucam_pass
+  extra: |
+    {
+      "jwt_url": "https://url.for.token/",
+      "jwt_token_path": "dict.path.to.token"
     }
   port: null
   schema: null

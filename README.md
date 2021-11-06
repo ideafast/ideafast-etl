@@ -1,3 +1,6 @@
+[![Tests](https://github.com/ideafast/ideafast-etl/actions/workflows/tests.yml/badge.svg)](https://github.com/ideafast/ideafast-etl/actions/workflows/tests.yml)
+[![Language grade: JavaScript](https://img.shields.io/lgtm/grade/python/g/ideafast/ideafast-etl.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/ideafast/ideafast-etl/context:python)
+
 # IDEA-FAST WP3 ETL Pipeline
 
 An Extract, Transform, Load (ETL) pipeline based on [Apache Airflow](https://airflow.apache.org/). It periodically _extracts_ sensor data from wearables and mobile apps used in the [IDEA-FAST](www.idea-fast.eu) clinical observation study, _transforms_ the data by associating the appropriate anonymised participants, and _loads_ the data into the IDEA-FAST Data Management Portal.

@@ -6,7 +6,7 @@ from typing import Optional
 from airflow import DAG
 from airflow.operators.dummy import DummyOperator
 from airflow.operators.python import PythonOperator
-from etl_utils import db, ucam
+from etl_utils import db
 from etl_utils.db import DeviceType, Record
 from etl_utils.hooks.drm import DreemHook
 from etl_utils.hooks.ucam import UcamHook
@@ -79,11 +79,12 @@ with DAG(
         unresolved_dreem_uids = list(islice(db.get_unresolved_dreem_uids(), limit))
         resolved_dreem_uids = {}
 
-        for uid in unresolved_dreem_uids:
-            resolved = ucam.dreem_uid_to_serial(uid)
+        with UcamHook() as api:
+            for uid in unresolved_dreem_uids:
+                resolved = api.dreem_uid_to_serial(uid)
 
-            if resolved:
-                resolved_dreem_uids[uid] = resolved
+                if resolved:
+                    resolved_dreem_uids[uid] = resolved
 
         records_updated = [
             db.update_many_drm_serials(uid, serial)
@@ -119,11 +120,12 @@ with DAG(
         )
         resolved_dreem_serials = {}
 
-        for serial in unresolved_dreem_serials:
-            resolved = ucam.serial_to_id(serial)
+        with UcamHook() as api:
+            for serial in unresolved_dreem_serials:
+                resolved = api.serial_to_id(serial)
 
-            if resolved:
-                resolved_dreem_serials[serial] = resolved
+                if resolved:
+                    resolved_dreem_serials[serial] = resolved
 
         records_updated = [
             db.update_many_device_ids(serial, device_id, DeviceType.DRM)

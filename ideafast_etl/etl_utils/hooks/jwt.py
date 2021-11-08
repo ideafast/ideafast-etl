@@ -90,7 +90,6 @@ class JwtHook(BaseHook):
 
         # if expired (thown and passed exception), or no token - fetch one
         response = requests.Session().send(self._jwt_prepared_request())
-        print(response.request.body)
         response.raise_for_status()
         self.jwt_token = self._find_jwt_token(
             jwt_path=self.jwt_token_path, jwt_payload=response.json()

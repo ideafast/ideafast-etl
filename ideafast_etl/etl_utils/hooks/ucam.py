@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+import csv
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
+from functools import lru_cache
+from pathlib import Path
+from typing import Dict, List, Optional
 
 import requests
 from etl_utils.hooks.jwt import JwtHook
+
+CURRENT_DIR = Path(__file__).parent
 
 
 class DiseaseType(Enum):
@@ -123,6 +128,58 @@ class UcamHook(JwtHook):
             if within_start_period and within_end_period:
                 return patient.patient_id
         return None
+
+    @lru_cache(maxsize=None)
+    def _csv_as_dict(self, path: Path) -> Dict[str, str]:
+        """
+        Load full CSV as dict into memory for quick lookup.
+
+        Assumes csv rows are unique.
+
+        Note
+        ----
+        This needs updating after Dreem updated their data upload approach.
+        Currently does a local lookup from a csv
+        """
+        with open(path, mode="r") as file:
+            data = {rows[0]: rows[1] for rows in csv.reader(file)}
+
+        return data
+
+    def dreem_uid_to_serial(self, device_uid: str) -> Optional[str]:
+        """
+        Resolve a Dreem device UID to a device serial
+
+        Note
+        ----
+        This needs updating after Dreem updated their data upload approach.
+        Currently does a local lookup from a csv
+
+        Parameters
+        ----------
+        device_uid : str
+            The uid as assigned by the Dreem api from the recording.
+
+        """
+        data = self._csv_as_dict(CURRENT_DIR.parent / "dummy/dreem_uid_to_serial.csv")
+        return data.get(device_uid)
+
+    def serial_to_id(self, serial: str) -> Optional[str]:
+        """
+        Resolve any device serial to an IDEA-FAST device ID
+
+        Note
+        ----
+        Needs to be reimplemented once UCAM integrates this service
+        Currently does a local lookup from a csv
+
+        Parameters
+        ----------
+        serial : str
+            The serial of the device, as taken from the physical device itself
+        """
+        data = self._csv_as_dict(CURRENT_DIR.parent / "dummy/serial_to_id.csv")
+        return data.get(serial)
 
     @staticmethod
     def normalise_day(_datetime: datetime) -> datetime:

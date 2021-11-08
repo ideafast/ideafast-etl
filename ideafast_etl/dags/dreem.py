@@ -4,8 +4,8 @@ from itertools import islice
 from typing import Optional
 
 from airflow import DAG
-from airflow.operators.dummy import DummyOperator
 from airflow.operators.python import PythonOperator
+from airflow.utils.trigger_rule import TriggerRule
 from etl_utils import db
 from etl_utils.db import DeviceType, Record
 from etl_utils.hooks.drm import DreemHook
@@ -22,7 +22,7 @@ with DAG(
     render_template_as_native_obj=True,
 ) as dag:
 
-    def _download_latest_dreem_metadata(limit: Optional[int] = None) -> None:
+    def _download_metadata(limit: Optional[int] = None) -> None:
         """
         Retrieve records on Dreem's servers, filters only the new
 
@@ -179,10 +179,55 @@ with DAG(
             f"{resolved_dreem_patients} patient_ids were resolved and updated on the DB"
         )
 
+    def _group_records(limit: Optional[int] = None) -> None:
+        """
+        Group unprocessed records by day following DMP upload standards
+
+        Parameters
+        ----------
+        limit : None | int
+            limit of how many down and upload pairs to handle this run - useful for testing
+            or managing workload in batches
+        """
+        logging.info(f"Grouping records with limit {limit}")
+
+    def _extract_prep_load(
+        run_id: str,
+        limit: Optional[int] = None,
+    ) -> None:
+        """
+        Download, zip, and upload records to the DMP
+
+        Unfortunately, dynamically generating task within a DAG is proven to be difficult and hacky.
+        For now, this task just sequentially handles down and upload.
+
+        Parameters
+        ----------
+        limit : None | int
+            limit of how many down and upload pairs to handle this run - useful for testing
+            or managing workload in batches
+        """
+        logging.info(f"downloading and uploading data for {run_id} with limit {limit}")
+
+        # - sort
+        # - groupby device
+        # - group by participant
+        # - group by day
+        # create folder
+        # download into that folder
+        # zip
+        # upload
+        # update record
+        # remove folder
+        # if fail, still remove folder
+
+    def _cleanup(run_id: str) -> None:
+        logging.info(f"cleaning up for {run_id}")
+
     # Set all tasks
-    download_latest_dreem_metadata = PythonOperator(
-        task_id="download_latest_dreem_metadata",
-        python_callable=_download_latest_dreem_metadata,
+    download_metadata = PythonOperator(
+        task_id="download_metadata",
+        python_callable=_download_metadata,
         op_kwargs={"limit": 1},
     )
 
@@ -204,29 +249,36 @@ with DAG(
         op_kwargs={"limit": 1},
     )
 
-    extract_prep_load = DummyOperator(
+    group_records = PythonOperator(
+        task_id="group_records",
+        python_callable=_group_records,
+        op_kwargs={"limit": 1},
+    )
+
+    extract_prep_load = PythonOperator(
         task_id="extract_prep_load",
         # uses a task pool to limit local storage
         pool="down_upload_pool",
-        # - sort
-        # - groupby device
-        # - group by participant
-        # - group by day
-        # create folder
-        # download into that folder
-        # zip
-        # upload
-        # update record
-        # remove folder
-        # if fail, still remove folder
+        python_callable=_extract_prep_load,
+        op_kwargs={"limit": 1, "run_id": "{{ run_id }}"},
     )
 
-    # Set dependencies between the static tasks
+    cleanup = PythonOperator(
+        task_id="cleanup",
+        python_callable=_cleanup,
+        # trigger cleanup even if upstream tasks are skipped or failed
+        trigger_rule=TriggerRule.ALL_DONE,
+        op_kwargs={"run_id": "{{ run_id }}"},
+    )
+
+    # Set linear dependencies between the static tasks
 
     (
-        download_latest_dreem_metadata
+        download_metadata
         >> resolve_device_serials
         >> resolve_device_ids
         >> resolve_patient_ids
+        >> group_records
         >> extract_prep_load
+        >> cleanup
     )

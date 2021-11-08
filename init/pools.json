@@ -1,6 +1,0 @@
-{
-    "down_upload_pool": {
-        "slots": 2,
-        "description": "Reduce the number of tasks storing sensor data locally and thereby risk of memory overload"
-    }
-}

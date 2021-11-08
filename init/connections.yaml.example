@@ -3,7 +3,7 @@
 # before, leaves the (possibly adjusted) in place. See docker-file airflow-webserver
 
 dreem_kiel:
-  conn_type: HTTP
+  conn_type: JWT
   description: "Custom API connection with Dreem servers"
   host: deem_url_api
   login: deem_user_kiel

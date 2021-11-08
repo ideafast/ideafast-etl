@@ -284,7 +284,6 @@ services:
       - bash
       - -c
       - |
-        airflow pools import init/pools.json
         airflow connections import init/connections.yaml
 
   flower:

@@ -6,8 +6,7 @@ from typing import Optional
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.trigger_rule import TriggerRule
-from etl_utils import db
-from etl_utils.db import DeviceType, Record
+from etl_utils.hooks.db import DeviceType, LocalMongoHook, Record
 from etl_utils.hooks.drm import DreemHook
 from etl_utils.hooks.ucam import UcamHook
 
@@ -22,6 +21,8 @@ with DAG(
     render_template_as_native_obj=True,
 ) as dag:
 
+    dag_run_download_folder = "{{dag.dag_id}}_{{ts_nodash}}"
+
     def _download_metadata(limit: Optional[int] = None) -> None:
         """
         Retrieve records on Dreem's servers, filters only the new
@@ -32,11 +33,14 @@ with DAG(
             limit of how many records to handle this run - useful for testing
             or managing workload in batches
         """
-        with DreemHook(conn_id="dreem_kiel") as api:
+        with LocalMongoHook() as db:
+
             # get all results
-            result = [r for r in api.get_metadata()]
+            with DreemHook(conn_id="dreem_kiel") as drm:
+                result = [r for r in drm.get_metadata()]
+
             # create hashes of found records, deduct with known records
-            known = db.get_hashes(DeviceType.DRM)
+            known = db.find_hashes(DeviceType.DRM)
 
             # generator for new unknown records
             new_record_gen = (
@@ -54,7 +58,7 @@ with DAG(
             )
 
             new_records = list(islice(new_record_gen, limit))
-            new_ids = db.create_many_records(new_records) if new_records else []
+            new_ids = db.custom_insert_many(new_records) if new_records else []
 
             # Logging
             logging.info(f"{len(result)} Dreem records found on the server")
@@ -76,30 +80,33 @@ with DAG(
             limit of how many device uids to handle this run - useful for testing
             or managing workload in batches
         """
-        unresolved_dreem_uids = list(islice(db.get_unresolved_dreem_uids(), limit))
-        resolved_dreem_uids = {}
+        with LocalMongoHook() as db:
+            unresolved_dreem_uids = list(
+                islice(db.find_drm_deviceserial_is_none(), limit)
+            )
+            resolved_dreem_uids = {}
 
-        with UcamHook() as api:
-            for uid in unresolved_dreem_uids:
-                resolved = api.dreem_uid_to_serial(uid)
+            with UcamHook() as api:
+                for uid in unresolved_dreem_uids:
+                    resolved = api.dreem_uid_to_serial(uid)
 
-                if resolved:
-                    resolved_dreem_uids[uid] = resolved
+                    if resolved:
+                        resolved_dreem_uids[uid] = resolved
 
-        records_updated = [
-            db.update_many_drm_serials(uid, serial)
-            for uid, serial in resolved_dreem_uids.items()
-        ]
+            records_updated = [
+                db.update_drmuid_to_serial(uid, serial)
+                for uid, serial in resolved_dreem_uids.items()
+            ]
 
-        # Logging
-        logging.info(
-            f"{len(unresolved_dreem_uids)} unresolved device uids were collected"
-            + f"from the DB (limit was {limit})"
-        )
-        logging.info(f"{len(resolved_dreem_uids)} uids were resolved into serials")
-        logging.info(
-            f"{sum(records_updated)} records in the DB were updated with the resolved serials"
-        )
+            # Logging
+            logging.info(
+                f"{len(unresolved_dreem_uids)} unresolved device uids were collected"
+                + f"from the DB (limit was {limit})"
+            )
+            logging.info(f"{len(resolved_dreem_uids)} uids were resolved into serials")
+            logging.info(
+                f"{sum(records_updated)} records in the DB were updated with the resolved serials"
+            )
 
     def _resolve_device_ids(limit: Optional[int] = None) -> None:
         """
@@ -115,34 +122,35 @@ with DAG(
             limit of how many device serials to handle this run - useful for testing
             or managing workload in batches
         """
-        unresolved_dreem_serials = list(
-            islice(db.get_unresolved_device_serials(DeviceType.DRM), limit)
-        )
-        resolved_dreem_serials = {}
+        with LocalMongoHook() as db:
+            unresolved_dreem_serials = list(
+                islice(db.find_deviceid_is_none(DeviceType.DRM), limit)
+            )
+            resolved_dreem_serials = {}
 
-        with UcamHook() as api:
-            for serial in unresolved_dreem_serials:
-                resolved = api.serial_to_id(serial)
+            with UcamHook() as ucam:
+                for serial in unresolved_dreem_serials:
+                    resolved = ucam.serial_to_id(serial)
 
-                if resolved:
-                    resolved_dreem_serials[serial] = resolved
+                    if resolved:
+                        resolved_dreem_serials[serial] = resolved
 
-        records_updated = [
-            db.update_many_device_ids(serial, device_id, DeviceType.DRM)
-            for serial, device_id in resolved_dreem_serials.items()
-        ]
+            records_updated = [
+                db.update_many_serial_to_deviceid(serial, device_id, DeviceType.DRM)
+                for serial, device_id in resolved_dreem_serials.items()
+            ]
 
-        # Logging
-        logging.info(
-            f"{len(unresolved_dreem_serials)} unresolved device_serials were collected"
-            + f"from the DB (limit was {limit})"
-        )
-        logging.info(
-            f"{len(resolved_dreem_serials)} serials were resolved into device_ids"
-        )
-        logging.info(
-            f"{sum(records_updated)} records in the DB were updated with the resolved serials"
-        )
+            # Logging
+            logging.info(
+                f"{len(unresolved_dreem_serials)} unresolved device_serials were collected"
+                + f"from the DB (limit was {limit})"
+            )
+            logging.info(
+                f"{len(resolved_dreem_serials)} serials were resolved into device_ids"
+            )
+            logging.info(
+                f"{sum(records_updated)} records in the DB were updated with the resolved serials"
+            )
 
     def _resolve_patient_ids(limit: Optional[int] = None) -> None:
         """
@@ -154,34 +162,38 @@ with DAG(
             limit of how many device serials to handle this run - useful for testing
             or managing workload in batches
         """
-        unresolved_dreem_patients = list(
-            islice(db.get_unresolved_patient_records(DeviceType.DRM), limit)
-        )
-        resolved_dreem_patients = 0
+        with LocalMongoHook() as db:
+            unresolved_dreem_patients = list(
+                islice(db.find_patientid_is_none(DeviceType.DRM), limit)
+            )
+            resolved_dreem_patients = 0
 
-        with UcamHook() as api:
-            for patient in unresolved_dreem_patients:
-                resolved = api.resolve_patient_id(
-                    patient.device_id, patient.start, patient.end
-                )
+            with UcamHook() as ucam:
+                for patient in unresolved_dreem_patients:
+                    resolved = ucam.resolve_patient_id(
+                        patient.device_id, patient.start, patient.end
+                    )
 
-                if resolved and db.update_record(
-                    patient._id, dict(patient_id=resolved)
-                ):
-                    resolved_dreem_patients += 1
+                    if resolved and db.custom_update_one(
+                        patient._id, dict(patient_id=resolved)
+                    ):
+                        resolved_dreem_patients += 1
 
-        # Logging
-        logging.info(
-            f"{len(unresolved_dreem_patients)} unresolved device_serials were collected"
-            + f" from the DB (limit was {limit})"
-        )
-        logging.info(
-            f"{resolved_dreem_patients} patient_ids were resolved and updated on the DB"
-        )
+            # Logging
+            logging.info(
+                f"{len(unresolved_dreem_patients)} unresolved device_serials were collected"
+                + f" from the DB (limit was {limit})"
+            )
+            logging.info(
+                f"{resolved_dreem_patients} patient_ids were resolved and updated on the DB"
+            )
 
     def _group_records(limit: Optional[int] = None) -> None:
         """
-        Group unprocessed records by day following DMP upload standards
+        Group and update unprocessed records with their DMP ID.
+
+        The DMP expects DEVICEID-PATIENTID-STARTWEAR-ENDWEAR. Records are uploaded on a day basis.
+        For Dreem, this is determined to be 12:00:00 - 11:59:59 next day
 
         Parameters
         ----------
@@ -189,10 +201,15 @@ with DAG(
             limit of how many down and upload pairs to handle this run - useful for testing
             or managing workload in batches
         """
-        logging.info(f"Grouping records with limit {limit}")
+        with LocalMongoHook() as db:
+            ungrouped_records = db.find_dmpid_is_none(DeviceType.DRM)
+
+            logging.info(
+                f"Grouping {len(ungrouped_records)} records with limit {limit}"
+            )
 
     def _extract_prep_load(
-        run_id: str,
+        download_folder: str,
         limit: Optional[int] = None,
     ) -> None:
         """
@@ -207,22 +224,50 @@ with DAG(
             limit of how many down and upload pairs to handle this run - useful for testing
             or managing workload in batches
         """
-        logging.info(f"downloading and uploading data for {run_id} with limit {limit}")
+        with LocalMongoHook() as db:
+            unfinished_dmp_ids = list(
+                islice(db.find_notuploaded_dmpids(DeviceType.DRM), limit)
+            )
 
-        # - sort
-        # - groupby device
-        # - group by participant
-        # - group by day
-        # create folder
-        # download into that folder
-        # zip
-        # upload
-        # update record
-        # remove folder
-        # if fail, still remove folder
+            # with DreemHook(conn_id="dreem_kiel") as dreem_api, DmpHook() as dmp_api:
+            #     for dmp_id in unfinished_dmp_ids:
+            #         # if we find a grouping (all records with the same dmp_id) has both
+            #         # uploaded and not-uploaded records, the pipeline needs to UPDATE
+            #         # the DMP. Else, if all not uploaded, just UPLOAD
 
-    def _cleanup(run_id: str) -> None:
-        logging.info(f"cleaning up for {run_id}")
+            #         # get all records with this dmp_id
+            #         pass
+
+            logging.info(
+                f"downloading and uploading {len(unfinished_dmp_ids)} folders with limit {limit}"
+            )
+
+            # - sort
+            # - groupby device
+            # - group by participant
+            # - group by day
+            # create folder
+            # download into that folder
+            # zip
+            # upload
+            # update record
+            # remove folder
+            # if fail, still remove folder
+
+    def _cleanup(download_folder: str) -> None:
+        """
+        Clean up any downloads into the
+
+        Unfortunately, dynamically generating task within a DAG is proven to be difficult and hacky.
+        For now, this task just sequentially handles down and upload.
+
+        Parameters
+        ----------
+        limit : None | int
+            limit of how many down and upload pairs to handle this run - useful for testing
+            or managing workload in batches
+        """
+        logging.info(f"cleaning up for {download_folder}")
 
     # Set all tasks
     download_metadata = PythonOperator(
@@ -257,10 +302,8 @@ with DAG(
 
     extract_prep_load = PythonOperator(
         task_id="extract_prep_load",
-        # uses a task pool to limit local storage
-        pool="down_upload_pool",
         python_callable=_extract_prep_load,
-        op_kwargs={"limit": 1, "run_id": "{{ run_id }}"},
+        op_kwargs={"download_folder": dag_run_download_folder, "limit": 1},
     )
 
     cleanup = PythonOperator(
@@ -268,7 +311,7 @@ with DAG(
         python_callable=_cleanup,
         # trigger cleanup even if upstream tasks are skipped or failed
         trigger_rule=TriggerRule.ALL_DONE,
-        op_kwargs={"run_id": "{{ run_id }}"},
+        op_kwargs={"download_folder": dag_run_download_folder},
     )
 
     # Set linear dependencies between the static tasks

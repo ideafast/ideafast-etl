@@ -96,7 +96,11 @@ class UcamHook(JwtHook):
         end_wear = self.normalise_day(end_wear)
         device = self.get_device(device_id)
 
-        return self.get_patient_by_wear_period(device, start_wear, end_wear)
+        return (
+            self.get_patient_by_wear_period(device.patients, start_wear, end_wear)
+            if device
+            else None
+        )
 
     def get_device(self, device_id: str) -> Optional[Device]:
         """Retrieve a device from the UCAM DB"""
@@ -112,12 +116,12 @@ class UcamHook(JwtHook):
 
     def get_patient_by_wear_period(
         self,
-        device: Device,
+        patients: List[Patient],
         start_wear: datetime,
         end_wear: datetime,
     ) -> Optional[str]:
         """Return patient_id by wear period"""
-        for patient in device.patients:
+        for patient in patients:
             patient_start = self.normalise_day(patient.start_wear)
             # if end_wear is none, use today
             patient_end = self.normalise_day(patient.end_wear or datetime.today())

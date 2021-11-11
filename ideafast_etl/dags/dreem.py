@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from itertools import islice
 from typing import Optional
 
@@ -188,25 +188,45 @@ with DAG(
                 f"{resolved_dreem_patients} patient_ids were resolved and updated on the DB"
             )
 
-    def _group_records(limit: Optional[int] = None) -> None:
+    def _group_records() -> None:
         """
-        Group and update unprocessed records with their DMP ID.
+        Group and update unprocessed records with their DMP ID. Cannot be limited to avoid data gaps
 
         The DMP expects DEVICEID-PATIENTID-STARTWEAR-ENDWEAR. Records are uploaded on a day basis.
-        For Dreem, this is determined to be 12:00:00 - 11:59:59 next day
+        For Dreem, this is determined based on the start-time of the recording:
+            start-time between 12:00:00 Monday and 11:59:59 Tuesday is data for `Monday-Tuesday`
+            start-time 12:00:00 or later on Tuesday is data for `Tuesday-Monday`
 
-        Parameters
-        ----------
-        limit : None | int
-            limit of how many down and upload pairs to handle this run - useful for testing
-            or managing workload in batches
+        Note
+        ----
+        Above threshold needs to be discussed with WP4 at TFTI
         """
         with LocalMongoHook() as db:
             ungrouped_records = db.find_dmpid_is_none(DeviceType.DRM)
+            grouped_records = 0
+            groups = set()
 
-            logging.info(
-                f"Grouping {len(ungrouped_records)} records with limit {limit}"
-            )
+            midday = datetime.strptime("12:00:00", "%H:%M:%S").time()
+
+            for r in ungrouped_records:
+                # start-time before 12:00 then data belong to yesterday+today
+                if r.start.time() < midday:
+                    end = r.start.strftime("%Y%m%d")
+                    start = (r.start - timedelta(days=1)).strftime("%Y%m%d")
+                # start-time after 12:00 then data belong to today+tomorrow
+                else:
+                    start = r.start.strftime("%Y%m%d")
+                    end = (r.start + timedelta(days=1)).strftime("%Y%m%d")
+
+                dmp_id = f"{r.device_id.replace('-','')}-{r.patient_id.replace('-','')}-{start}-{end}"
+                db.custom_update_one(r._id, {"dmp_id": dmp_id})
+
+                grouped_records += 1
+                groups.add(dmp_id)
+
+            logging.info(f"Grouping {len(ungrouped_records)} records")
+            logging.info(f"{len(groups)} dmp_id unique groups were established")
+            logging.info(f"{grouped_records} records updated on the DB")
 
     def _extract_prep_load(
         download_folder: str,

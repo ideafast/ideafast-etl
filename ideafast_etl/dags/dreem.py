@@ -10,6 +10,8 @@ from etl_utils.hooks.db import DeviceType, LocalMongoHook, Record
 from etl_utils.hooks.drm import DreemHook
 from etl_utils.hooks.ucam import UcamHook
 
+from ideafast_etl.etl_utils.hooks.dmp import DmpHook
+
 # DAG setup with tasks
 with DAG(
     dag_id="dreem",
@@ -84,7 +86,7 @@ with DAG(
             unresolved_dreem_uids = list(
                 islice(db.find_drm_deviceserial_is_none(), limit)
             )
-            resolved_dreem_uids = {}
+            resolved_dreem_uids = dict()
 
             with UcamHook() as api:
                 for uid in unresolved_dreem_uids:
@@ -162,6 +164,8 @@ with DAG(
             limit of how many device serials to handle this run - useful for testing
             or managing workload in batches
         """
+        # TODO: get Airflow variable to map dataset names/IDs (e.g., COS)
+
         with LocalMongoHook() as db:
             unresolved_dreem_patients = list(
                 islice(db.find_patientid_is_none(DeviceType.DRM), limit)
@@ -173,6 +177,8 @@ with DAG(
                     resolved = ucam.resolve_patient_id(
                         patient.device_id, patient.start, patient.end
                     )
+
+                    # TODO: also get dmp dataset from UCAM and store in DB
 
                     if resolved and db.custom_update_one(
                         patient._id, dict(patient_id=resolved)
@@ -203,8 +209,7 @@ with DAG(
         """
         with LocalMongoHook() as db:
             ungrouped_records = db.find_dmpid_is_none(DeviceType.DRM)
-            grouped_records = 0
-            groups = set()
+            grouped_records, groups = 0, set()
 
             midday = datetime.strptime("12:00:00", "%H:%M:%S").time()
 
@@ -244,23 +249,47 @@ with DAG(
             limit of how many down and upload pairs to handle this run - useful for testing
             or managing workload in batches
         """
-        with LocalMongoHook() as db:
+        with LocalMongoHook() as db, DreemHook(
+            conn_id="dreem_kiel"
+        ) as drm, DmpHook() as dmp:
             unfinished_dmp_ids = list(
                 islice(db.find_notuploaded_dmpids(DeviceType.DRM), limit)
             )
+            finished_dmp_ids, processed_records = 0, 0
 
-            # with DreemHook(conn_id="dreem_kiel") as dreem_api, DmpHook() as dmp_api:
-            #     for dmp_id in unfinished_dmp_ids:
-            #         # if we find a grouping (all records with the same dmp_id) has both
-            #         # uploaded and not-uploaded records, the pipeline needs to UPDATE
-            #         # the DMP. Else, if all not uploaded, just UPLOAD
+            for dmp_id in unfinished_dmp_ids:
+                try:
+                    path = f"/downloads/dreem/{download_folder}"
+                    # pathlib.Path(path).mkdir(parents=True, exist_ok=True)
 
-            #         # get all records with this dmp_id
-            #         pass
+                    records = db.find_records_by_dmpid(dmp_id)
+                    dmp_dataset = records[0].dmp_dataset
+                    for record in records:
+                        drm.download_file(record.manufacturer_ref)
+                        # TODO: download data into assigned folder
+                        pass
+
+                    # TODO: Zip Folder
+
+                    # if any records already uploaded, perform DMP UPDATE
+                    if any([r.is_uploaded for r in records]):
+                        # TODO: Implement DMP update
+                        pass
+                    else:
+                        # TODO: Implement DMP upload
+                        dmp.dmp_upload(dmp_dataset, path)
+                        pass
+                except Exception:
+                    logging.error(f"Error in processing records with DMP ID {dmp_id}")
+                finally:
+                    # TODO: remove local folder with any files
+                    pass
 
             logging.info(
-                f"downloading and uploading {len(unfinished_dmp_ids)} folders with limit {limit}"
+                f"retrieved {len(unfinished_dmp_ids)} folders to be uploaded with limit {limit}"
             )
+            logging.info(f"down and uploaded {finished_dmp_ids} .zips to the DMP")
+            logging.info(f"finished {processed_records} records on the DB")
 
             # - sort
             # - groupby device

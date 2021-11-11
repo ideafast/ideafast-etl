@@ -42,6 +42,7 @@ class Record:
     device_serial: Optional[str] = None
     device_id: Optional[str] = None
     patient_id: Optional[str] = None
+    dmp_dataset: Optional[str] = None
     dmp_id: Optional[str] = None
     is_uploaded: bool = False
 

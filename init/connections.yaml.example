@@ -10,7 +10,7 @@ dreem_kiel:
   password: dreem_pass_kiel
   extra: |
     {
-      "jwt_url": "https://url.for.token/",
+      "jwt_url": "dreem_token_url",
       "jwt_token_path": "dict.path.to.token",
       "user_id": "dreem_kiel_uid"
     }
@@ -25,7 +25,21 @@ ucam_default:
   password: ucam_pass
   extra: |
     {
-      "jwt_url": "https://url.for.token/",
+      "jwt_url": "ucam_token_url",
+      "jwt_token_path": "dict.path.to.token"
+    }
+  port: null
+  schema: null
+
+dmp_default:
+  conn_type: JWT
+  description: "Custom API connection with ICL Data Management Portal"
+  host: dmp_url
+  login: publickey
+  password: signature
+  extra: |
+    {
+      "jwt_url": "dmp_url"
       "jwt_token_path": "dict.path.to.token"
     }
   port: null

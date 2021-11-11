@@ -40,3 +40,7 @@ class DreemHook(JwtHook):
             result: dict = response.json()
             url = result.get("next")
             yield from result.get("results")
+
+    def download_file(self, file_ref: str) -> bool:
+        """Download file from Dreem servers"""
+        raise NotImplementedError

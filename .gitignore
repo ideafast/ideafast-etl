@@ -20,6 +20,7 @@ airflow/*
 !dev.env
 logs/
 plugins/
+downloads/
 
 # Testing
 .coverage

@@ -24,7 +24,7 @@ with DAG(
     render_template_as_native_obj=True,
 ) as dag:
 
-    dag_run_download_folder = "{{dag.dag_id}}_{{ts_nodash}}"
+    dag_run_download_folder = "/opt/airflow/downloads/{{dag.dag_id}}_{{ts_nodash}}"
 
     def _download_metadata(limit: Optional[int] = None) -> None:
         """
@@ -258,7 +258,7 @@ with DAG(
 
             for dmp_id in unfinished_dmp_ids:
 
-                path = Path(f"/downloads/dreem/{download_folder}")
+                path = Path(download_folder) / dmp_id
                 path.mkdir(parents=True, exist_ok=True)
                 logging.debug(f"Created {str(path)} in local storage")
 

@@ -36,6 +36,7 @@ class Patient:
     end_wear: Optional[datetime]
     deviations: Optional[str]
     vttsma_id: Optional[str]
+    dmp_dataset: Optional[str]
 
     @classmethod
     def serialize(cls, payload: dict) -> Patient:
@@ -49,6 +50,8 @@ class Patient:
             vttsma_id=payload["vtT_id"],
             patient_id=payload["subject_id"],
             disease=DiseaseType(int(payload["subject_Group"])),
+            # TODO: adjust with UCAM database code
+            dmp_dataset=None,
         )
 
     @staticmethod

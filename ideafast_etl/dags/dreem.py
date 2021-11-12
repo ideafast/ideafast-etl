@@ -1,16 +1,17 @@
 import logging
+import shutil
 from datetime import datetime, timedelta
 from itertools import islice
+from pathlib import Path
 from typing import Optional
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.trigger_rule import TriggerRule
 from etl_utils.hooks.db import DeviceType, LocalMongoHook, Record
+from etl_utils.hooks.dmp import DmpHook
 from etl_utils.hooks.drm import DreemHook
 from etl_utils.hooks.ucam import UcamHook
-
-from ideafast_etl.etl_utils.hooks.dmp import DmpHook
 
 # DAG setup with tasks
 with DAG(
@@ -164,8 +165,6 @@ with DAG(
             limit of how many device serials to handle this run - useful for testing
             or managing workload in batches
         """
-        # TODO: get Airflow variable to map dataset names/IDs (e.g., COS)
-
         with LocalMongoHook() as db:
             unresolved_dreem_patients = list(
                 islice(db.find_patientid_is_none(DeviceType.DRM), limit)
@@ -177,8 +176,6 @@ with DAG(
                     resolved = ucam.resolve_patient_id(
                         patient.device_id, patient.start, patient.end
                     )
-
-                    # TODO: also get dmp dataset from UCAM and store in DB
 
                     if resolved and db.custom_update_one(
                         patient._id, dict(patient_id=resolved)
@@ -249,6 +246,8 @@ with DAG(
             limit of how many down and upload pairs to handle this run - useful for testing
             or managing workload in batches
         """
+        # dmp_mappings: dict = Variable.get("dmp_dataset_mappings", deserialize_json=True)
+
         with LocalMongoHook() as db, DreemHook(
             conn_id="dreem_kiel"
         ) as drm, DmpHook() as dmp:
@@ -258,31 +257,49 @@ with DAG(
             finished_dmp_ids, processed_records = 0, 0
 
             for dmp_id in unfinished_dmp_ids:
+
+                path = Path(f"/downloads/dreem/{download_folder}")
+                path.mkdir(parents=True, exist_ok=True)
+                logging.debug(f"Created {str(path)} in local storage")
+
+                records = db.find_records_by_dmpid(dmp_id)
+                # dmp_dataset = records[0].dmp_dataset
+                # dmp_dataset: str = dmp_mappings.get("TEST")
+
                 try:
-                    path = f"/downloads/dreem/{download_folder}"
-                    # pathlib.Path(path).mkdir(parents=True, exist_ok=True)
-
-                    records = db.find_records_by_dmpid(dmp_id)
-                    dmp_dataset = records[0].dmp_dataset
+                    # DOWNLOAD
                     for record in records:
-                        drm.download_file(record.manufacturer_ref)
-                        # TODO: download data into assigned folder
-                        pass
+                        drm.download_file(record.manufacturer_ref, path)
 
-                    # TODO: Zip Folder
+                    # ZIP
+                    # zip_path = dmp.zip_folder(path)
 
+                    # UPLOAD
                     # if any records already uploaded, perform DMP UPDATE
                     if any([r.is_uploaded for r in records]):
+                        success = False
                         # TODO: Implement DMP update
-                        pass
                     else:
-                        # TODO: Implement DMP upload
-                        dmp.dmp_upload(dmp_dataset, path)
-                        pass
-                except Exception:
-                    logging.error(f"Error in processing records with DMP ID {dmp_id}")
+                        # success = dmp.dmp_upload(dmp_dataset, zip_path)
+                        success = dmp.test_upload()
+
+                    if not success:
+                        # abort updating, retry next time
+                        continue
+
+                    # UPDATE DB
+                    update_count = db.update_dmpid_records_uploaded(dmp_id)
+                    processed_records += update_count
+
+                except Exception as e:
+                    logging.error(
+                        f"Error in processing records with DMP ID {dmp_id}", exc_info=e
+                    )
+
                 finally:
-                    # TODO: remove local folder with any files
+                    # always remove local data, regardless of the outcome
+                    dmp.rm_local_data(path.parent / f"{path.name}.zip")
+                    logging.debug(f"Removed {str(path)} in local storage")
                     pass
 
             logging.info(
@@ -316,37 +333,39 @@ with DAG(
             limit of how many down and upload pairs to handle this run - useful for testing
             or managing workload in batches
         """
-        logging.info(f"cleaning up for {download_folder}")
+        if Path(download_folder).is_dir():
+            shutil.rmtree(download_folder)
+        logging.info(f"Removed {download_folder} from local storage")
 
     # Set all tasks
     download_metadata = PythonOperator(
         task_id="download_metadata",
         python_callable=_download_metadata,
-        op_kwargs={"limit": 1},
+        op_kwargs={"limit": 15},
     )
 
     resolve_device_serials = PythonOperator(
         task_id="resolve_device_serials",
         python_callable=_resolve_device_serials,
-        op_kwargs={"limit": 1},
+        op_kwargs={"limit": 15},
     )
 
     resolve_device_ids = PythonOperator(
         task_id="resolve_device_ids",
         python_callable=_resolve_device_ids,
-        op_kwargs={"limit": 1},
+        op_kwargs={"limit": 15},
     )
 
     resolve_patient_ids = PythonOperator(
         task_id="resolve_patient_ids",
         python_callable=_resolve_patient_ids,
-        op_kwargs={"limit": 1},
+        op_kwargs={"limit": 15},
     )
 
     group_records = PythonOperator(
         task_id="group_records",
         python_callable=_group_records,
-        op_kwargs={"limit": 1},
+        op_kwargs={"limit": 15},
     )
 
     extract_prep_load = PythonOperator(

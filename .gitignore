@@ -5,6 +5,7 @@ __pycache__
 # secrets
 *.env
 init/connections.yaml
+init/variables.json
 
 # local files for development
 ideafast_etl/etl_utils/dummy/*

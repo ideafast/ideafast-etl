@@ -185,6 +185,15 @@ class LocalMongoHook(MongoHook):
         """Get all records from a specific dmp_id"""
         return list(self.__custom_find(filter={"dmp_id": dmp_id}))
 
+    def update_dmpid_records_uploaded(self, dmp_id: str) -> int:
+        """Update all records 'is_uploaded' with the same dmp_id"""
+        result = self.update_many(
+            **DEFAULTS,
+            filter_doc={"dmp_id": dmp_id},
+            update_doc={"$set": {"is_uploaded": True}},
+        )
+        return result.modified_count
+
     def find_dmpid_is_none(self, device_type: DeviceType) -> List[Record]:
         """Get all records from a specific device type without dmp_id, with patient_id"""
         # Returns a list, as we need to handle everything we have to avoid data gaps

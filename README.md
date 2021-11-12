@@ -13,7 +13,7 @@ Apache Airflow is ran using `Docker`, so please ensure you have a Docker client 
 
 
 ### Initialise
-1. Remove `.example` from the `.env.example` filename, and adjust the values appropriately. Do the same for the `init/connections.yaml.example` file.
+1. Remove `.example` from the `.env.example` filename, and adjust the values appropriately. Do the same for the `.example` files in the `init/` folder.
 1. Spin up the Airflow containers, run:
 
     ```shell
@@ -101,7 +101,7 @@ Below are some design choices based on our need to maintain the pipeline in the 
 
 #### Variables
 
-In order to allow the Airflow maintainer to easily update any connection URI or variable when needed, connections and variables that have the potential to change are added through the `ideafast-init` Docker container. It reads from the [`init`](/init) folder. _As long as you don't delete the `postrgres-db-volume` volume, `connections` will persists across spin ups and downs (including any manual changes to them in the UI_. **This is not the case for `pools` that will be overriden with each spinup**. Any internal connections or variables (e.g., MongoDB) are added through environmental variables.
+In order to allow the Airflow maintainer to easily update any connection URI or variable when needed, connections and variables that have the potential to change are added through the `ideafast-init` Docker container. It reads from the [`init`](/init) folder. _As long as you don't delete the `postrgres-db-volume` volume, `connections` will persists across spin ups and downs (including any manual changes to them in the UI_. Any internal connections or variables (e.g., MongoDB) are added through environmental variables.
 
 > Note, DAGS also have access to Airflow Engine variables at runtime, which can be used through {{Jinja templating}}. See a [list of out-of-the-box available variables](https://airflow.apache.org/docs/apache-airflow/stable/templates-ref.html).
 

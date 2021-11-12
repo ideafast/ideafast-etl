@@ -1,0 +1,6 @@
+{
+  "dmp_dataset_mapping": {
+    "TEST": "dmp_test_dataset_id",
+    "COS": "dmp_cos_dataset_id"
+  }
+}

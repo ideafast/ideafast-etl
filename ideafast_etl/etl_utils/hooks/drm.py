@@ -1,5 +1,7 @@
+from pathlib import Path
 from typing import Iterator
 
+import requests
 from etl_utils.hooks.jwt import JwtHook
 
 
@@ -41,6 +43,34 @@ class DreemHook(JwtHook):
             url = result.get("next")
             yield from result.get("results")
 
-    def download_file(self, file_ref: str) -> bool:
-        """Download file from Dreem servers"""
-        raise NotImplementedError
+    def download_file(self, file_ref: str, download_path: Path) -> bool:
+        """
+        Download file from Dreem servers
+
+        Gets file location by querying Dreem API, then downloads from that
+        location (file_url includes authentication)
+        """
+        session = self.get_conn()
+        url = self.base_url + f"dreem/algorythm/record/{file_ref}/h5/"
+
+        response = session.get(url)
+        response.raise_for_status()
+        result: dict = response.json()
+        file_url = result.get("data_url", None)
+        # NOTE: file_url may be empty if a file is unavailable:
+        # (1): file is on dreem headband but not uploaded
+        # (2): file is being processed by dreem's algorithms
+        if not file_url:
+            return False
+
+        file_path = download_path / f"{file_ref}.h5"
+
+        with requests.get(url, stream=True) as response:
+            response.raise_for_status()
+
+            with open(file_path, "wb") as output_file:
+                for chunk in response.iter_content(chunk_size=1024):
+                    if chunk:
+                        output_file.write(chunk)
+
+        return True

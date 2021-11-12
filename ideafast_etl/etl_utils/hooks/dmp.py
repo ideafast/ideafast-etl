@@ -1,3 +1,5 @@
+import json
+import logging
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -8,13 +10,17 @@ from dmpy.client import Dmpy
 from dmpy.core.payloads import FileUploadPayload
 from dmpy.core.utils import read_text_resource as dmpy_resource
 from etl_utils.hooks.jwt import JwtHook
+from requests_toolbelt.multipart.encoder import (
+    MultipartEncoder,
+    MultipartEncoderMonitor,
+)
 
 
 class DmpHook(JwtHook):
     """
     Hook for interfacing with the JWT API from ICL's DMP
 
-    Based on JwtHook class (inherited) and Dmpy client class (referenced)
+    Based on JwtHook class (inherited) and Dmpy client class (copied)
 
     Parameters
     ----------
@@ -40,12 +46,17 @@ class DmpHook(JwtHook):
         }
         return requests.Request("POST", self.jwt_url, json=request).prepare()
 
-    def get_access_token(self) -> str:
-        """Override Dmpy method with Hook method"""
-        return self._get_jwt_token()
+    def test_upload(self) -> bool:
+        """Test method for debugging"""
+        return True
 
-    def dmp_upload(self, dmp_dataset: str, path: Path) -> bool:
-        """Upload a single file to the DMP. Uses the Dmpy.method"""
+    def upload(self, dmp_dataset: str, path: Path) -> bool:
+        """
+        Upload a single file to the DMP. Based on the Dmpy.method
+
+        Currently uses a mix of copied code and module methods, should be aligned
+        with - potentially - an update on the dmpy module
+        """
         patient_id, device_id, start, end = path.stem.split("-")
 
         checksum = Dmpy.checksum(path)
@@ -62,8 +73,75 @@ class DmpHook(JwtHook):
             dmp_dataset,
         )
 
-        # TODO: replace this odd overriding with own implementation of the upload
-        return Dmpy.upload(self, payload)
+        encoder = MultipartEncoder(
+            {
+                "operations": payload.operations(),
+                "map": json.dumps({"fileName": ["variables.file"]}),
+                "fileName": (
+                    payload.path.name,
+                    open(
+                        payload.path,
+                        "rb",
+                    ),
+                    "application/octet-stream",
+                ),
+            }
+        )
+
+        percent_uploaded = 0
+
+        def log_progress(monitor: MultipartEncoderMonitor) -> None:
+            """Log data transfer progress when 10% of file uploaded."""
+            # Gain access to the variable in the outter scope
+            nonlocal percent_uploaded
+
+            bytes_sent = monitor.bytes_read
+            upload_percent = int(bytes_sent / monitor.len * 100)
+            blocksize = 8192
+
+            if (
+                bytes_sent == blocksize
+                or upload_percent % 10 == 0
+                and percent_uploaded != upload_percent
+            ):
+                logging.info(f"{upload_percent}% Uploaded | {bytes_sent} Bytes Sent")
+                percent_uploaded = upload_percent
+
+        monitor = MultipartEncoderMonitor(encoder, log_progress)
+
+        headers = {
+            "Content-Type": monitor.content_type,
+            "Authorization": self.get_access_token(),
+        }
+
+        try:
+            # Seconds to wait to establish connection with server
+            connect = 4
+            # Wait at most 5 minutes for server response between bytes sent
+            # required as server timeout after uploading large files (>2GB)
+            read = 60 * 5 + 2
+            response = requests.post(
+                self.url,
+                data=monitor,
+                headers=headers,
+                timeout=(connect, read),
+                stream=True,
+            )
+            response.raise_for_status()
+
+            json_response = response.json()
+
+            if "errors" in json_response:
+                logging.error(f"Response was: {json_response}")
+                raise Exception("UPLOAD_ERROR")
+
+            logging.info(f"Uploaded {percent_uploaded}%")
+            logging.debug(f"Response: {json_response}")
+
+            return True
+        except Exception:
+            logging.error("Exception:", exc_info=True)
+        return False
 
     @staticmethod
     def rm_local_data(zip_path: Path) -> None:

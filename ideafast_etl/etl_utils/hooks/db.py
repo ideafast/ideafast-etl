@@ -54,6 +54,7 @@ class Record:
         result.update(input.encode("utf-8"))
         return result.hexdigest()
 
+    @property
     def as_db_dict(self) -> dict:
         """Convert the dataclass to dict for inserting into MongoDB"""
         result = asdict(self)
@@ -74,13 +75,13 @@ class LocalMongoHook(MongoHook):
 
     def custom_insert_one(self, record: Record) -> ObjectId:
         """Insert one record into the DB, return the ID"""
-        result = self.insert_one(**DEFAULTS, doc=record.as_db_dict())
+        result = self.insert_one(**DEFAULTS, doc=record.as_db_dict)
         return result.inserted_id
 
     def custom_insert_many(self, records: List[Record]) -> List[ObjectId]:
         """Insert multiple records into the DB, return the ID"""
         result = self.insert_many(
-            **DEFAULTS, docs=[r.as_db_dict() for r in records], ordered=False
+            **DEFAULTS, docs=[r.as_db_dict for r in records], ordered=False
         )
         return result.inserted_ids
 

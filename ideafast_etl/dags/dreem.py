@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Optional
 
 from airflow import DAG
+from airflow.models import Variable
 from airflow.operators.python import PythonOperator
 from airflow.utils.trigger_rule import TriggerRule
 from etl_utils.hooks.db import DeviceType, LocalMongoHook, Record
@@ -246,7 +247,7 @@ with DAG(
             limit of how many down and upload pairs to handle this run - useful for testing
             or managing workload in batches
         """
-        # dmp_mappings: dict = Variable.get("dmp_dataset_mappings", deserialize_json=True)
+        dmp_mappings: dict = Variable.get("dmp_dataset_mappings", deserialize_json=True)
 
         with LocalMongoHook() as db, DreemHook(
             conn_id="dreem_kiel"
@@ -264,27 +265,31 @@ with DAG(
 
                 records = db.find_records_by_dmpid(dmp_id)
                 # dmp_dataset = records[0].dmp_dataset
-                # dmp_dataset: str = dmp_mappings.get("TEST")
+                dmp_dataset: str = dmp_mappings.get("TEST")
 
                 try:
                     # DOWNLOAD
-                    for record in records:
+                    total_records = len(records)
+                    for index, record in enumerate(records, start=1):
                         drm.download_file(record.manufacturer_ref, path)
+                        logging.debug(
+                            f"Downloaded {index}/{total_records} files for {dmp_id}"
+                        )
 
                     # ZIP
-                    # zip_path = dmp.zip_folder(path)
+                    zip_path = dmp.zip_folder(path)
 
                     # UPLOAD
                     # if any records already uploaded, perform DMP UPDATE
                     if any([r.is_uploaded for r in records]):
-                        success = False
-                        # TODO: Implement DMP update
+                        raise NotImplementedError
                     else:
                         # success = dmp.dmp_upload(dmp_dataset, zip_path)
-                        success = dmp.test_upload()
+                        success = dmp.upload(dmp_dataset, zip_path)
 
                     if not success:
                         # abort updating, retry next time
+                        # Log something here...
                         continue
 
                     # UPDATE DB
@@ -299,13 +304,12 @@ with DAG(
                 finally:
                     # always remove local data, regardless of the outcome
                     dmp.rm_local_data(path.parent / f"{path.name}.zip")
-                    logging.debug(f"Removed {str(path)} in local storage")
                     pass
 
             logging.info(
                 f"retrieved {len(unfinished_dmp_ids)} folders to be uploaded with limit {limit}"
             )
-            logging.info(f"down and uploaded {finished_dmp_ids} .zips to the DMP")
+            logging.info(f"uploaded {finished_dmp_ids} .zips to the DMP")
             logging.info(f"finished {processed_records} records on the DB")
 
             # - sort

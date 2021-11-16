@@ -46,18 +46,14 @@ class DmpHook(JwtHook):
         }
         return requests.Request("POST", self.jwt_url, json=request).prepare()
 
-    def test_upload(self) -> bool:
-        """Test method for debugging"""
-        return True
-
-    def upload(self, dmp_dataset: str, path: Path) -> bool:
+    def upload(self, dmp_dataset: str, path: str) -> bool:
         """
         Upload a single file to the DMP. Based on the Dmpy.method
 
         Currently uses a mix of copied code and module methods, should be aligned
         with - potentially - an update on the dmpy module
         """
-        patient_id, device_id, start, end = path.stem.split("-")
+        patient_id, device_id, start, end = Path(path).stem.split("-")
 
         checksum = Dmpy.checksum(path)
         start_wear = self.weartime_in_ms(start)
@@ -111,7 +107,7 @@ class DmpHook(JwtHook):
 
         headers = {
             "Content-Type": monitor.content_type,
-            "Authorization": self.get_access_token(),
+            "Authorization": self._get_jwt_token(),
         }
 
         try:
@@ -146,13 +142,19 @@ class DmpHook(JwtHook):
     @staticmethod
     def rm_local_data(zip_path: Path) -> None:
         """Delete local folder based on zip path"""
-        zip_path.unlink()
-        shutil.rmtree(zip_path.with_suffix(""))
+        if zip_path.exists():
+            zip_path.unlink()
+        folder_path = zip_path.with_suffix("")
+        if folder_path.exists():
+            shutil.rmtree(zip_path.with_suffix(""))
+        logging.debug(f"Cleaned up {zip_path.stem}")
 
     @staticmethod
     def zip_folder(path: Path) -> Path:
         """Zip folder and return path"""
-        return Path(shutil.make_archive(str(path), "zip", path))
+        zip_path = Path(shutil.make_archive(str(path), "zip", path))
+        logging.debug(f"Created {zip_path.name}")
+        return zip_path
 
     @staticmethod
     def weartime_in_ms(wear_time: str) -> int:

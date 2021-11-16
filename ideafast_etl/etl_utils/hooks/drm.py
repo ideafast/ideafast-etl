@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from typing import Iterator
 
@@ -65,12 +66,24 @@ class DreemHook(JwtHook):
 
         file_path = download_path / f"{file_ref}.h5"
 
-        with requests.get(url, stream=True) as response:
+        with requests.get(file_url, stream=True) as response:
             response.raise_for_status()
+            total_size = int(response.headers.get("content-length"))
+            total_down, percent_down = 0, 0
 
             with open(file_path, "wb") as output_file:
                 for chunk in response.iter_content(chunk_size=1024):
                     if chunk:
                         output_file.write(chunk)
+                        total_down += len(chunk)
+                    if (
+                        chunk
+                        and (status := int((total_down / total_size) * 100))
+                        > percent_down + 10
+                    ):
+                        percent_down = round(status, -1)
+                        logging.info(f"{percent_down}% Downloaded")
+
+                logging.info("100% Downloaded")
 
         return True

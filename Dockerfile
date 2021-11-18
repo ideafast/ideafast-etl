@@ -8,4 +8,4 @@ RUN apt-get update && \
 USER ${AIRFLOW_UID}
 COPY requirements.txt /tmp/requirements.txt
 
-RUN pip install -r /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt

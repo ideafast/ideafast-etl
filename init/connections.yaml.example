@@ -35,10 +35,15 @@ dmp_default:
   conn_type: JWT
   description: "Custom API connection with ICL Data Management Portal"
   host: dmp_url
-  login: publickey
+
+  # NOTE: the public key is too long for postrgres (VARCHAR(500)).
+  # to not mess with Postgress tables, refer to a key in extra (code will pick it up)
+  # be sure to escape newlines in the variable (i.e., \\n, not \n)
+  login: extra://public_key
   password: signature
   extra: |
     {
+      "public_key": "public_key"
       "jwt_url": "dmp_url"
       "jwt_token_path": "dict.path.to.token"
     }

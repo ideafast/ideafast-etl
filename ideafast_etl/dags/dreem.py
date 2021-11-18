@@ -295,6 +295,7 @@ with DAG(
                     # UPDATE DB
                     update_count = db.update_dmpid_records_uploaded(dmp_id)
                     processed_records += update_count
+                    finished_dmp_ids += 1
 
                 except Exception as e:
                     logging.error(
@@ -304,6 +305,7 @@ with DAG(
                 finally:
                     # always remove local data, regardless of the outcome
                     dmp.rm_local_data(path.parent / f"{path.name}.zip")
+                    logging.info("Removed (intermediate) downloaded files")
                     pass
 
             logging.info(
@@ -311,18 +313,6 @@ with DAG(
             )
             logging.info(f"uploaded {finished_dmp_ids} .zips to the DMP")
             logging.info(f"finished {processed_records} records on the DB")
-
-            # - sort
-            # - groupby device
-            # - group by participant
-            # - group by day
-            # create folder
-            # download into that folder
-            # zip
-            # upload
-            # update record
-            # remove folder
-            # if fail, still remove folder
 
     def _cleanup(download_folder: str) -> None:
         """

@@ -3,7 +3,6 @@ import logging
 import shutil
 from datetime import datetime
 from pathlib import Path
-from typing import Any
 
 import requests
 from dmpy.client import Dmpy
@@ -28,19 +27,29 @@ class DmpHook(JwtHook):
         ID of the connection to use to connect to the Dreem API
     """
 
-    def __init__(self, **kwds: Any) -> None:
-        """Construct, but not initialise, the Hook."""
-        super().__init__(**kwds)
+    default_conn_name = "dmp_default"
 
-        # required for Dmpy.upload method
-        self.url = self.base_url
+    def __init__(self, conn_id: str = default_conn_name) -> None:
+        """Init a JwtHook with overriden default connection name"""
+        super().__init__(conn_id=conn_id)
 
     def _jwt_prepared_request(self) -> requests.PreparedRequest:
-        """Return a Dmpy prepared JWT, overriding default JwtHook method"""
+        """
+        Return a Dmpy prepared JWT, overriding default JwtHook method
+
+        To store long user/pass (e.g., public/private keys) in extras dict, and link to with
+        "extra://extras_dict_key_to_long_value"
+        """
+        prefix = "extra://"
+        user = (
+            self.user
+            if not self.user.startswith(prefix)
+            else self.extras.get(self.user[len(prefix) :])
+        )
         request = {
             "query": dmpy_resource("token.graphql"),
             "variables": {
-                "pubkey": self.user,
+                "pubkey": user,
                 "signature": self.passw,
             },
         }
@@ -53,6 +62,8 @@ class DmpHook(JwtHook):
         Currently uses a mix of copied code and module methods, should be aligned
         with - potentially - an update on the dmpy module
         """
+        session = self.get_conn()
+
         patient_id, device_id, start, end = Path(path).stem.split("-")
 
         checksum = Dmpy.checksum(path)
@@ -105,7 +116,7 @@ class DmpHook(JwtHook):
 
         monitor = MultipartEncoderMonitor(encoder, log_progress)
 
-        headers = {
+        session.headers = {
             "Content-Type": monitor.content_type,
             "Authorization": self._get_jwt_token(),
         }
@@ -116,14 +127,23 @@ class DmpHook(JwtHook):
             # Wait at most 5 minutes for server response between bytes sent
             # required as server timeout after uploading large files (>2GB)
             read = 60 * 5 + 2
-            response = requests.post(
-                self.url,
+            response = session.post(
+                self.base_url,
                 data=monitor,
-                headers=headers,
                 timeout=(connect, read),
                 stream=True,
             )
             response.raise_for_status()
+
+            # catch json decoder errors if API has not implemented HTTP errors fully
+            try:
+                json_response = response.json()
+            except json.decoder.JSONDecodeError as e:
+                logging.error(
+                    "Unable to unpack HTTP body response in completing DMP upload: "
+                    + str(e)
+                )
+                raise requests.HTTPError from e
 
             json_response = response.json()
 

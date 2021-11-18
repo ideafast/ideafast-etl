@@ -83,7 +83,7 @@ class UcamHook(JwtHook):
 
     def __init__(self, conn_id: str = default_conn_name) -> None:
         """Init a JwtHook with overriden default connection name"""
-        JwtHook.__init__(self, conn_id=conn_id)
+        super().__init__(conn_id=conn_id)
 
     def _jwt_prepared_request(self) -> requests.PreparedRequest:
         """Return a prepared JWT requests specific to UCAM"""

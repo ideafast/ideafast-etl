@@ -1,6 +1,6 @@
 import logging
 import shutil
-from datetime import datetime, timedelta
+from datetime import datetime
 from itertools import islice
 from pathlib import Path
 from typing import Optional
@@ -13,6 +13,7 @@ from etl_utils.hooks.db import DeviceType, LocalMongoHook, Record
 from etl_utils.hooks.dmp import DmpHook
 from etl_utils.hooks.drm import DreemHook
 from etl_utils.hooks.ucam import UcamHook
+from etl_utils.operators.ucam import GroupRecordsOperator, ResolveDeviceIdOperator
 
 # DAG setup with tasks
 with DAG(
@@ -112,50 +113,6 @@ with DAG(
                 f"{sum(records_updated)} records in the DB were updated with the resolved serials"
             )
 
-    def _resolve_device_ids(limit: Optional[int] = None) -> None:
-        """
-        Retrieve records with unknown device IDs, and try to resolve them
-
-        Note
-        ----
-        Requires update once UCAM includes device serials
-
-        Parameters
-        ----------
-        limit : None | int
-            limit of how many device serials to handle this run - useful for testing
-            or managing workload in batches
-        """
-        with LocalMongoHook() as db:
-            unresolved_dreem_serials = list(
-                islice(db.find_deviceid_is_none(DeviceType.DRM), limit)
-            )
-            resolved_dreem_serials = {}
-
-            with UcamHook() as ucam:
-                for serial in unresolved_dreem_serials:
-                    resolved = ucam.serial_to_id(serial)
-
-                    if resolved:
-                        resolved_dreem_serials[serial] = resolved
-
-            records_updated = [
-                db.update_many_serial_to_deviceid(serial, device_id, DeviceType.DRM)
-                for serial, device_id in resolved_dreem_serials.items()
-            ]
-
-            # Logging
-            logging.info(
-                f"{len(unresolved_dreem_serials)} unresolved device_serials were collected"
-                + f"from the DB (limit was {limit})"
-            )
-            logging.info(
-                f"{len(resolved_dreem_serials)} serials were resolved into device_ids"
-            )
-            logging.info(
-                f"{sum(records_updated)} records in the DB were updated with the resolved serials"
-            )
-
     def _resolve_patient_ids(limit: Optional[int] = None) -> None:
         """
         Retrieve records with unknown patient IDs, and try to resolve them
@@ -191,45 +148,6 @@ with DAG(
             logging.info(
                 f"{resolved_dreem_patients} patient_ids were resolved and updated on the DB"
             )
-
-    def _group_records() -> None:
-        """
-        Group and update unprocessed records with their DMP ID. Cannot be limited to avoid data gaps
-
-        The DMP expects DEVICEID-PATIENTID-STARTWEAR-ENDWEAR. Records are uploaded on a day basis.
-        For Dreem, this is determined based on the start-time of the recording:
-            start-time between 12:00:00 Monday and 11:59:59 Tuesday is data for `Monday-Tuesday`
-            start-time 12:00:00 or later on Tuesday is data for `Tuesday-Monday`
-
-        Note
-        ----
-        Above threshold needs to be discussed with WP4 at TFTI
-        """
-        with LocalMongoHook() as db:
-            ungrouped_records = db.find_dmpid_is_none(DeviceType.DRM)
-            grouped_records, groups = 0, set()
-
-            midday = datetime.strptime("12:00:00", "%H:%M:%S").time()
-
-            for r in ungrouped_records:
-                # start-time before 12:00 then data belong to yesterday+today
-                if r.start.time() < midday:
-                    end = r.start.strftime("%Y%m%d")
-                    start = (r.start - timedelta(days=1)).strftime("%Y%m%d")
-                # start-time after 12:00 then data belong to today+tomorrow
-                else:
-                    start = r.start.strftime("%Y%m%d")
-                    end = (r.start + timedelta(days=1)).strftime("%Y%m%d")
-
-                dmp_id = f"{r.device_id.replace('-','')}-{r.patient_id.replace('-','')}-{start}-{end}"
-                db.custom_update_one(r._id, {"dmp_id": dmp_id})
-
-                grouped_records += 1
-                groups.add(dmp_id)
-
-            logging.info(f"Grouping {len(ungrouped_records)} records")
-            logging.info(f"{len(groups)} dmp_id unique groups were established")
-            logging.info(f"{grouped_records} records updated on the DB")
 
     def _extract_prep_load(
         download_folder: str,
@@ -344,10 +262,8 @@ with DAG(
         op_kwargs={"limit": 15},
     )
 
-    resolve_device_ids = PythonOperator(
-        task_id="resolve_device_ids",
-        python_callable=_resolve_device_ids,
-        op_kwargs={"limit": 15},
+    resolve_device_ids = ResolveDeviceIdOperator(
+        task_id="resolve_device_ids", limit=15, device_type=DeviceType.DRM
     )
 
     resolve_patient_ids = PythonOperator(
@@ -356,10 +272,11 @@ with DAG(
         op_kwargs={"limit": 15},
     )
 
-    group_records = PythonOperator(
+    group_records = GroupRecordsOperator(
         task_id="group_records",
-        python_callable=_group_records,
-        op_kwargs={"limit": 15},
+        cut_off_time="12:00:00",
+        # TODO: discuss threshold with WP4 at TFTI
+        device_type=DeviceType.DRM,
     )
 
     extract_prep_load = PythonOperator(

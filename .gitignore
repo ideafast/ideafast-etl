@@ -1,7 +1,15 @@
 **/.DS_Store
 **/*/__pycache__/
 __pycache__
+
+# secrets
 *.env
+init/connections.yaml
+init/variables.json
+
+# local files for development
+ideafast_etl/etl_utils/dummy/*
+!.gitkeep
 
 # Exported reuirements, better to export locally
 requirements.txt
@@ -12,6 +20,7 @@ airflow/*
 !dev.env
 logs/
 plugins/
+downloads/
 
 # Testing
 .coverage

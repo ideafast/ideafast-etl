@@ -8,17 +8,19 @@ import cli
 
 @pytest.fixture
 def runner() -> click.testing.CliRunner:
+    """Return a CLI console for testing"""
     return click.testing.CliRunner()
 
 
 def test_version_succeeds(runner: click.testing.CliRunner) -> None:
-
+    """Test if the CLI initialises"""
     result = runner.invoke(cli.version)
 
     assert result.exit_code == 0
 
 
-def test_abc_aborted(runner: click.testing.CliRunner) -> None:
+def test_bump_run(runner: click.testing.CliRunner) -> None:
+    """Test if the bump version command runs"""
     bump_type = "patch"
 
     with patch("cli.run_command") as mock_run_command:

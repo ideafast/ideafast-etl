@@ -1,0 +1,51 @@
+# Example connections.yaml file that get's loaded when airflow spins up the first time
+# This add `connections` amd `variables` to Airflow, but if the container already spun up
+# before, leaves the (possibly adjusted) in place. See docker-file airflow-webserver
+
+dreem_kiel:
+  conn_type: JWT
+  description: "Custom API connection with Dreem servers"
+  host: deem_url_api
+  login: deem_user_kiel
+  password: dreem_pass_kiel
+  extra: |
+    {
+      "jwt_url": "dreem_token_url",
+      "jwt_token_path": "dict.path.to.token",
+      "user_id": "dreem_kiel_uid"
+    }
+  port: null
+  schema: null
+
+ucam_default:
+  conn_type: JWT
+  description: "Custom API connection with UCAM servers"
+  host: ucam_url_api
+  login: ucam_user
+  password: ucam_pass
+  extra: |
+    {
+      "jwt_url": "ucam_token_url",
+      "jwt_token_path": "dict.path.to.token"
+    }
+  port: null
+  schema: null
+
+dmp_default:
+  conn_type: JWT
+  description: "Custom API connection with ICL Data Management Portal"
+  host: dmp_url
+
+  # NOTE: the public key is too long for postrgres (VARCHAR(500)).
+  # to not mess with Postgress tables, refer to a key in extra (code will pick it up)
+  # be sure to escape newlines in the variable (i.e., \\n, not \n)
+  login: extra://public_key
+  password: signature
+  extra: |
+    {
+      "public_key": "public_key"
+      "jwt_url": "dmp_url"
+      "jwt_token_path": "dict.path.to.token"
+    }
+  port: null
+  schema: null

@@ -8,8 +8,7 @@ VERSION_BUMPS = ["patch", "minor", "major"]
 
 
 def run_command(command: str, capture: bool = False) -> subprocess.CompletedProcess:
-    """Helper method to run shell commands"""
-
+    """Run shell commands given the provided command"""
     # NOTE: shell=True is highly discouraged due to potential shell-injection attacks. Use with care.
     return subprocess.run([command], shell=True, capture_output=capture)  # noqa
 
@@ -21,14 +20,17 @@ def get_version() -> Optional[str]:
 
 
 def get_latest_docker_tag() -> Optional[str]:
+    """Retrieve latest tag from the IDEAFAST Docker Images on you machine"""
     res = run_command(
-        f"docker images {DOCKER_REGISTRY} --format {{{{.Tag}}}} | sort | head -n 1",
+        f"docker images {DOCKER_REGISTRY} --format {{{{.Tag}}}} "
+        f"| egrep -v 'latest' | sort -r | head -n 1",
         True,
     )
     return res.stdout.decode("ascii").rstrip() or None
 
 
 def get_latest_git_tag() -> Optional[str]:
+    """Get the latest Git tag on your machine"""
     res = run_command("git tag --sort=-refname |head -n 1", True)
     return res.stdout.decode("ascii").rstrip() or None
 
@@ -47,6 +49,7 @@ def push_version_remote(version: str) -> None:
 
 
 def build_docker(version: str) -> None:
+    """Build the docker image using Poetry's exported requirements"""
     # Export the poetry (non-dev) requirements
     run_command(
         "poetry export -f requirements.txt --output requirements.txt --without-hashes"
@@ -71,7 +74,6 @@ def cli() -> None:
 )
 def bump(bump_type: str) -> str:
     """Bump version number."""
-
     new_version = bump_version(bump_type)
 
     if click.confirm("Do you want to push this tag to GitHub too?"):
@@ -126,7 +128,7 @@ def publish() -> None:
 
 @cli.command()
 def version() -> None:
-    """Displays current version tags"""
+    """Display current version tags for Poetry, Git and Docker"""
     click.echo(f"Poetry: {get_version()}")
     click.echo(f"Git: {get_latest_git_tag()}")
     click.echo(f"Docker: {get_latest_docker_tag()}")

@@ -13,24 +13,14 @@ Apache Airflow is ran using `Docker`, so please ensure you have a Docker client 
 
 
 ### Initialise
-1. Remove `.example` from the `.env.example` filename, and adjust the values appropriately.
-1. The very first time running Airflow, you will need to set up the database migrations and create accounts, run:
-
-    ```shell
-    docker-compose up airflow-init
-    ```
-
-1. Once it's finished, you can spin up the Airflow containers, run:
+1. Remove `.example` from the `.env.example` filename, and adjust the values appropriately. Do the same for the `.example` files in the `init/` folder.
+1. Spin up the Airflow containers, run:
 
     ```shell
     docker-compose up -d
     ```
     You can check the status of the Docker containers by running `docker ps`, which should indiciate _(healthy)_ after a short while.
-1. Navigate to _localhost:8080_ to see the Airflow UI. You can also check Airflow's status with some CLI commands, such as:
-    ```shell
-    curl -X GET --user "$username:$userpass" "http://localhost:8080/api/v1/dags"
-    ```
-
+1. Navigate to _localhost:8080_ to see the Airflow UI. You can also check Airflow's status with some CLI commands, see below.
 1. It is recommended to properly shut down the docker container once you are finished. Run
     ```shell
     docker-compose down
@@ -99,6 +89,7 @@ Example cli commands (using the wrapper script):
 ./airflow.sh info   # get generic info
 ./airflow.sh dags list   # list all known dags
 ./airflow.sh dags test dummy_dag 2021-10-26   # run 'dummy_dag' DAG once (whether it is paused or not)
+/airflow.sh tasks test dummy_dag join_datasets 2021-10-26 # run 'join_datasets' task from the 'dummy_dag' DAG once (whether it is paused or not)
 ./airflow.sh dags test dummy_dag 2021-10-26 --dry-run   # dry-run 'dummy_dag' DAG to see {{ templates variables }} rendered
 
 ./airflow.sh cheat-sheet   # show CLI commands
@@ -110,7 +101,7 @@ Below are some design choices based on our need to maintain the pipeline in the 
 
 #### Variables
 
-For any known [variables](https://airflow.apache.org/docs/apache-airflow/stable/howto/variable.html), [connection URIs](https://airflow.apache.org/docs/apache-airflow/stable/howto/connection.html) (e.g., username/passwords), Airflow enables us to pass these through as environmental variables (e.g., the mongo DB connection string). However, any environmental variable is not shown (or editable) in the UI. In order to allow the Airflow maintainer to easily update any connection URI or variable when needed, connections and variables that have the potential to change need to be added manually in the UI. _As long as you don't delete the `postrgres-db-volume` volume, these details will persists across spin ups and downs_. Any internal connections or variables are added through environmental variables.
+In order to allow the Airflow maintainer to easily update any connection URI or variable when needed, connections and variables that have the potential to change are added through the `ideafast-init` Docker container. It reads from the [`init`](/init) folder. _As long as you don't delete the `postrgres-db-volume` volume, `connections` will persists across spin ups and downs (including any manual changes to them in the UI_. Any internal connections or variables (e.g., MongoDB) are added through environmental variables.
 
 > Note, DAGS also have access to Airflow Engine variables at runtime, which can be used through {{Jinja templating}}. See a [list of out-of-the-box available variables](https://airflow.apache.org/docs/apache-airflow/stable/templates-ref.html).
 

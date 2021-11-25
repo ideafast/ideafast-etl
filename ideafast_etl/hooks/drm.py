@@ -3,7 +3,8 @@ from pathlib import Path
 from typing import Iterator
 
 import requests
-from etl_utils.hooks.jwt import JwtHook
+
+from ideafast_etl.hooks.jwt import JwtHook
 
 
 class DreemHook(JwtHook):

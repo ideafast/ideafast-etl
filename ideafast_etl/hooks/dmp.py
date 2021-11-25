@@ -8,11 +8,12 @@ import requests
 from dmpy.client import Dmpy
 from dmpy.core.payloads import FileUploadPayload
 from dmpy.core.utils import read_text_resource as dmpy_resource
-from etl_utils.hooks.jwt import JwtHook
 from requests_toolbelt.multipart.encoder import (
     MultipartEncoder,
     MultipartEncoderMonitor,
 )
+
+from ideafast_etl.hooks.jwt import JwtHook
 
 
 class DmpHook(JwtHook):

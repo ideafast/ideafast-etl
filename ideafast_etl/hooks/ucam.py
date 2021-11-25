@@ -9,7 +9,8 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 import requests
-from etl_utils.hooks.jwt import JwtHook
+
+from ideafast_etl.hooks.jwt import JwtHook
 
 CURRENT_DIR = Path(__file__).parent
 

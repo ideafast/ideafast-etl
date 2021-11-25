@@ -4,8 +4,9 @@ from itertools import islice
 from typing import Any, Optional
 
 from airflow.models.baseoperator import BaseOperator
-from etl_utils.hooks.db import DeviceType, LocalMongoHook
-from etl_utils.hooks.ucam import UcamHook
+
+from ideafast_etl.hooks.db import DeviceType, LocalMongoHook
+from ideafast_etl.hooks.ucam import UcamHook
 
 
 class ResolveDeviceIdOperator(BaseOperator):

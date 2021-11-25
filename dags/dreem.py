@@ -9,11 +9,12 @@ from airflow import DAG
 from airflow.models import Variable
 from airflow.operators.python import PythonOperator
 from airflow.utils.trigger_rule import TriggerRule
-from etl_utils.hooks.db import DeviceType, LocalMongoHook, Record
-from etl_utils.hooks.dmp import DmpHook
-from etl_utils.hooks.drm import DreemHook
-from etl_utils.hooks.ucam import UcamHook
-from etl_utils.operators.ucam import GroupRecordsOperator, ResolveDeviceIdOperator
+
+from ideafast_etl.hooks.db import DeviceType, LocalMongoHook, Record
+from ideafast_etl.hooks.dmp import DmpHook
+from ideafast_etl.hooks.drm import DreemHook
+from ideafast_etl.hooks.ucam import UcamHook
+from ideafast_etl.operators.ucam import GroupRecordsOperator, ResolveDeviceIdOperator
 
 # DAG setup with tasks
 with DAG(

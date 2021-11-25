@@ -8,8 +8,12 @@ init/connections.yaml
 init/variables.json
 
 # local files for development
-ideafast_etl/etl_utils/dummy/*
+ideafast_etl/dummy/*
 !.gitkeep
+
+# custom code is stored in a root-level folder (ideafast_etl)
+# but loaded into the 'dag' folder (which in airflow is /root)
+dags/ideafast_etl
 
 # Exported reuirements, better to export locally
 requirements.txt

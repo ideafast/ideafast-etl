@@ -36,8 +36,11 @@ class ResolveDeviceIdOperator(BaseOperator):
             unresolved_serials = list(
                 islice(db.find_deviceid_is_none(self.device_type), self.limit)
             )
-            print(db.find_deviceid_is_none)
             resolved_serials = {}
+
+            if not unresolved_serials:
+                # prevents collecting UCAM connection if not needed
+                return True
 
             with UcamHook() as ucam:
                 for serial in unresolved_serials:

@@ -36,6 +36,7 @@ class ResolveDeviceIdOperator(BaseOperator):
             unresolved_serials = list(
                 islice(db.find_deviceid_is_none(self.device_type), self.limit)
             )
+            print(db.find_deviceid_is_none)
             resolved_serials = {}
 
             with UcamHook() as ucam:

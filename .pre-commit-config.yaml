@@ -16,6 +16,7 @@ repos:
     entry: poetry run flake8
     language: system
     types: [python]
+    exclude: ^tests/
   - id: isort
     name: isort
     entry: poetry run isort
@@ -26,3 +27,4 @@ repos:
     entry: poetry run mypy
     language: system
     types: [python]
+    exclude: ^tests/

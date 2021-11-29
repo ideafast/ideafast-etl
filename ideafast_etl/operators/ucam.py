@@ -110,9 +110,10 @@ class GroupRecordsOperator(BaseOperator):
 
             for r in ungrouped_records:
                 if self.midnight:
-                    start = end = r.start.strftime("%Y%m%d")
+                    start = end = r.start
                 else:
                     # data belongs to this day -1 and 0, or 0 and +1
+                    # A recording that is exactly ON the cutoff will belong to 0 + 1
                     shift = -1 if r.start.time() < self.cut_off_time else 0
                     start = r.start + (shift * timedelta(days=1))
                     end = start + timedelta(days=1)

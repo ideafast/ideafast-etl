@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from functools import reduce
 from typing import Any, Optional
 
@@ -62,7 +63,14 @@ class JwtHook(BaseHook):
             """Try to get value from dict, even if dict is None"""
             if not payload:
                 return None
-            return payload.get(key, None)
+            # can also access lists if needed, e.g., if key is '[1]'
+            if (num_key := re.match(r"^\[(\d+)\]$", key)) is not None:
+                try:
+                    return payload[int(num_key.group(1))]
+                except IndexError:
+                    return None
+            else:
+                return payload.get(key, None)
 
         found = reduce(get_despite_none, jwt_path.split("."), jwt_payload)
 

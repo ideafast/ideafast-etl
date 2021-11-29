@@ -35,7 +35,7 @@ def haystack():
     payload = {
         "haystack1": {"haystack2": {"haystack3": None, "haystack4": needle}},
         "haystack5": [{"haystack6": None}, {"haystack7": needle}],
-        "haystack4": "false copy",
+        "haystack8": {},
     }
     return (payload, needle)
 
@@ -48,6 +48,16 @@ def test_find_jwt_token(haystack):
     result = jwt_hook._find_jwt_token(path, haystack[0])
 
     assert result == haystack[1]
+
+
+def test_find_jwt_token_empty(haystack):
+    """Test that a deep _empty_ token can be found"""
+    path = "haystack8"
+    jwt_hook = JwtHook()
+
+    result = jwt_hook._find_jwt_token(path, haystack[0])
+
+    assert result == "{}"
 
 
 def test_find_jwt_token_with_list(haystack):
@@ -70,10 +80,15 @@ def test_find_jwt_token_starts_with_list(haystack):
     assert result == haystack[1]
 
 
-def test_find_not_existing_jwt_token():
+@pytest.mark.xfail(raises=KeyError, strict=True)
+def test_find_jwt_token_not_found(haystack):
     """Test that a deep token can _not_ be found"""
-    # should raise KeyError
-    assert False
+    path = "haystack5.[0].haystack70"
+    jwt_hook = JwtHook()
+
+    result = jwt_hook._find_jwt_token(path, haystack[0])
+
+    assert result == haystack[1]
 
 
 def test_jwt_prepared_request():

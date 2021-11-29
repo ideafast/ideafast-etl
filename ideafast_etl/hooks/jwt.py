@@ -61,7 +61,7 @@ class JwtHook(BaseHook):
 
         def get_despite_none(payload: Optional[dict], key: str) -> Any:
             """Try to get value from dict, even if dict is None"""
-            if not payload:
+            if not payload or not isinstance(payload, (dict, list)):
                 return None
             # can also access lists if needed, e.g., if key is '[1]'
             if (num_key := re.match(r"^\[(\d+)\]$", key)) is not None:

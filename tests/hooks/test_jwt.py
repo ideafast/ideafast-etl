@@ -1,31 +1,11 @@
-import json
-from unittest.mock import patch
+from datetime import datetime, timedelta, timezone
+from unittest.mock import Mock
 
+import jwt
 import pytest
-from airflow.models import Connection
+import requests
 
 from ideafast_etl.hooks.jwt import JwtHook
-
-
-@pytest.fixture(scope="module")
-def mock_connection():
-    """Return a test Connection for each Hook instance"""
-    extras = json.dumps(
-        {
-            "jwt_token": "test_jwt_token",
-            "jwt_token_path": "test.token.path",
-            "jwt_url": "test_jwt_url",
-        }
-    )
-    test_connection = Connection(
-        conn_id="test_conn",
-        host="test_host",
-        login="test_login",
-        password="test_passw",
-        extra=extras,
-    )
-    with patch.object(JwtHook, "get_connection", test_connection) as mock_connection:
-        yield mock_connection
 
 
 @pytest.fixture(scope="module")
@@ -93,22 +73,54 @@ def test_find_jwt_token_not_found(haystack):
 
 def test_jwt_prepared_request():
     """Test that the prepare method returns a PREPARED request"""
-    assert False
+    jwt_hook = JwtHook()
+    jwt_hook.jwt_url = "http://test"
+    jwt_hook.user = "test_user"
+    jwt_hook.passw = "test_passw"
+
+    result = jwt_hook._jwt_prepared_request()
+
+    assert isinstance(result, requests.PreparedRequest)
 
 
-def test_jwt_get_token_still_valid():
-    """Test that a jwt_token is returned if still valid"""
-    assert False
+def test_jwt_get_token_still_valid(mock_requests, mock_airflow_settings):
+    """
+    Test that a jwt_token is returned if still valid
+
+    i.e., not making a HTTP request or storing a new value in Airflow
+    """
+    jwt_token = jwt.encode({"some": "payload"}, "secret")
+    jwt_hook = JwtHook()
+    jwt_hook.jwt_token = jwt_token
+
+    result = jwt_hook._get_jwt_token()
+
+    assert result == jwt_token
+    assert not mock_requests.called
+    assert not mock_airflow_settings.called
 
 
-def test_jwt_get_token_not_valid():
-    """Test that a jwt_token is refreshed if no longer valid"""
-    assert False
+def test_jwt_get_token_not_valid(mock_requests, mock_airflow_settings):
+    """Test that a jwt_token is refreshed if no longer valid, and stored into connections"""
+    mock_response = Mock()
+    mock_response.json.return_value = {"jwt_key": "test_key"}
+    mock_requests.Session().send.return_value = mock_response
 
+    mock_airflow_settings.Session().query.return_value.filter.return_value.one.return_value.extra = (
+        "{}"
+    )
 
-def test_jwt_get_token_storing():
-    """Test that a jwt_token is stored in the Connections list"""
-    assert False
+    jwt_token = jwt.encode(
+        {"exp": datetime.now(tz=timezone.utc) - timedelta(seconds=30)}, "secret"
+    )
+    jwt_hook = JwtHook()
+    jwt_hook.jwt_token = jwt_token
+    jwt_hook.jwt_token_path = "jwt_key"
+
+    result = jwt_hook._get_jwt_token()
+
+    assert result == "test_key"
+    mock_airflow_settings.Session().commit.assert_called_once()
 
 
 def test_get_conn_returns_new():

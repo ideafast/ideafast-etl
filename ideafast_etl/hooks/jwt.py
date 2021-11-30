@@ -104,6 +104,7 @@ class JwtHook(BaseHook):
                 jwt.decode(
                     self.jwt_token,
                     options={"verify_signature": False, "verify_exp": True},
+                    # FIXME: requires `algorithm` parameter in future versions
                 )
                 return self.jwt_token
             except jwt.ExpiredSignatureError:

@@ -1,23 +1,11 @@
-from datetime import datetime, timedelta, timezone
-from unittest.mock import Mock
+import json
+from unittest.mock import MagicMock
 
 import jwt
 import pytest
 import requests
 
 from ideafast_etl.hooks.jwt import JwtHook
-
-
-@pytest.fixture(scope="module")
-def haystack():
-    """Return a haystack and needle for pathfinding"""
-    needle = "needle"
-    payload = {
-        "haystack1": {"haystack2": {"haystack3": None, "haystack4": needle}},
-        "haystack5": [{"haystack6": None}, {"haystack7": needle}],
-        "haystack8": {},
-    }
-    return (payload, needle)
 
 
 def test_find_jwt_token(haystack):
@@ -83,54 +71,54 @@ def test_jwt_prepared_request():
     assert isinstance(result, requests.PreparedRequest)
 
 
-def test_jwt_get_token_still_valid(mock_requests, mock_airflow_settings):
+def test_jwt_get_token_still_valid(mock_requests, new_jwt_key, mock_setting_session):
     """
     Test that a jwt_token is returned if still valid
 
     i.e., not making a HTTP request or storing a new value in Airflow
     """
-    jwt_token = jwt.encode({"some": "payload"}, "secret")
     jwt_hook = JwtHook()
-    jwt_hook.jwt_token = jwt_token
+    jwt_hook.jwt_token = new_jwt_key
 
     result = jwt_hook._get_jwt_token()
 
-    assert result == jwt_token
+    assert result == new_jwt_key
     assert not mock_requests.called
-    assert not mock_airflow_settings.called
+    assert not mock_setting_session.called
 
 
-def test_jwt_get_token_not_valid(mock_requests, mock_airflow_settings):
+def test_jwt_get_token_not_valid(mock_requests, old_jwt_key, mock_setting_session):
     """Test that a jwt_token is refreshed if no longer valid, and stored into connections"""
-    mock_response = Mock()
-    mock_response.json.return_value = {"jwt_key": "test_key"}
-    mock_requests.Session().send.return_value = mock_response
-
-    mock_airflow_settings.Session().query.return_value.filter.return_value.one.return_value.extra = (
-        "{}"
-    )
-
-    jwt_token = jwt.encode(
-        {"exp": datetime.now(tz=timezone.utc) - timedelta(seconds=30)}, "secret"
-    )
     jwt_hook = JwtHook()
-    jwt_hook.jwt_token = jwt_token
-    jwt_hook.jwt_token_path = "jwt_key"
+    jwt_hook.jwt_token = old_jwt_key
+    jwt_hook.jwt_token_path = "jwt_token"
 
     result = jwt_hook._get_jwt_token()
 
-    assert result == "test_key"
-    mock_airflow_settings.Session().commit.assert_called_once()
+    assert result != old_jwt_key
+    mock_setting_session().commit.assert_called_once()
 
 
-def test_get_conn_returns_new():
+def test_get_conn_returns_new(mock_requests, mock_setting_session, mock_get_connection):
     """Test that get_conn returns a new connection the first time"""
-    assert False
+    jwt_hook = JwtHook()
+
+    result = jwt_hook.get_conn()
+
+    assert result == mock_requests.Session()
 
 
-def test_get_conn_returns_existing():
+def test_get_conn_returns_existing(
+    mock_requests, mock_setting_session, mock_get_connection
+):
     """Test that get_conn returns an existing one if already created"""
-    assert False
+    jwt_hook = JwtHook()
+    jwt_hook.get_conn()  # received mock_requests
+    jwt_hook.session = MagicMock()  # override with new mock
+
+    result = jwt_hook.get_conn()  # should retunr overrided mock, not new one
+
+    assert result is not mock_requests.Session()
 
 
 def test_get_conn_throws():

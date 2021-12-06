@@ -5,22 +5,26 @@ from ideafast_etl.hooks.drm import DreemHook
 
 def test_metadata_call():
     """Test that the metadata call returns when payload contains dict items"""
-    pass
+
+    assert False
 
 
 def test_metadata_call_empty():
     """Test that the metadata call returns an empty iterator when no dict items"""
-    pass
+
+    assert False
 
 
 def test_download_file_success():
     """Test that a file is downloaded, and in the correct folder"""
-    pass
+
+    assert False
 
 
 def test_download_file_no_data_url():
     """Test that no file is downloaded when data_url is ommitted"""
-    pass
+
+    assert False
 
 
 def test_jwt_prepared_request():

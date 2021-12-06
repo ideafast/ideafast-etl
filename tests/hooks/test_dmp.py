@@ -4,11 +4,13 @@ from ideafast_etl.hooks.dmp import DmpHook
 
 
 def test_upload_success():
-    pass
+
+    assert False
 
 
 def test_upload_error():
-    pass
+
+    assert False
 
 
 def test_jwt_prepared_request():

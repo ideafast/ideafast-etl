@@ -1,7 +1,4 @@
-from airflow.models import DagBag
-
-
-def test_dummy_dag_loaded(dagbag: DagBag) -> None:
+def test_dummy_dag_loaded(dagbag) -> None:
     """Test if the DAGs are loaded (i.e., no parse errors)"""
     result = dagbag.dags["dummy_dag"]
 

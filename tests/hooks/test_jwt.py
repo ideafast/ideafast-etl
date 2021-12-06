@@ -1,9 +1,9 @@
 import json
 from unittest.mock import MagicMock
 
-import jwt
 import pytest
 import requests
+from airflow.models.connection import Connection
 
 from ideafast_etl.hooks.jwt import JwtHook
 
@@ -116,11 +116,27 @@ def test_get_conn_returns_existing(
     jwt_hook.get_conn()  # received mock_requests
     jwt_hook.session = MagicMock()  # override with new mock
 
-    result = jwt_hook.get_conn()  # should retunr overrided mock, not new one
+    result = jwt_hook.get_conn()  # should return overrided mock, not new one
 
     assert result is not mock_requests.Session()
 
 
-def test_get_conn_throws():
-    """Test that get_conn throws if host, jwt_url or jwt_token_path are not present"""
-    assert False
+@pytest.mark.parametrize("jwt_key", ["jwt_url", "jwt_token_path", "host"])
+@pytest.mark.xfail(raises=ValueError, strict=True)
+def test_get_conn_throws_jwt_keys(
+    jwt_key, connection_extras, connection_default_kwargs, mock_get_connection
+):
+    """Test that get_conn throws if jwt_url or jwt_token_path are not present"""
+    if "jwt" in jwt_key:
+        del connection_extras[jwt_key]
+    else:
+        del connection_default_kwargs[jwt_key]
+    mock_get_connection.return_value = Connection(
+        **connection_default_kwargs,
+        extra=json.dumps(connection_extras),
+    )
+    jwt_hook = JwtHook()
+
+    result = jwt_hook.get_conn()  # should return overrided mock, not new one
+
+    assert result

@@ -9,21 +9,30 @@ from airflow.models import Connection
 from ideafast_etl.hooks.jwt import JwtHook
 
 
-@pytest.fixture(scope="module")
-def mock_get_connection():
+@pytest.fixture()
+def connection_extras():
+    return {
+        "jwt_token_path": "jwt_token",
+        "jwt_url": "test_jwt_url",
+    }
+
+
+@pytest.fixture()
+def connection_default_kwargs():
+    return {
+        "conn_id": "test_conn",
+        "host": "test_host",
+        "login": "test_login",
+        "password": "test_passw",
+    }
+
+
+@pytest.fixture()
+def mock_get_connection(connection_extras, connection_default_kwargs):
     """Return a test Connection for each Hook instance"""
-    extras = json.dumps(
-        {
-            "jwt_token_path": "jwt_token",
-            "jwt_url": "test_jwt_url",
-        }
-    )
     test_connection = Connection(
-        conn_id="test_conn",
-        host="test_host",
-        login="test_login",
-        password="test_passw",
-        extra=extras,
+        **connection_default_kwargs,
+        extra=json.dumps(connection_extras),
     )
     with patch.object(
         JwtHook, "get_connection", return_value=test_connection

@@ -5,7 +5,7 @@ import nox
 from nox_poetry import session
 
 nox.options.sessions = "black", "lint", "mypy", "tests"
-LOCATIONS = "ideafast_etl", "tests", "noxfile.py"
+LOCATIONS = "ideafast_etl", "noxfile.py", "cli.py", "dags"
 
 
 def install_with_constraints(session: nox.Session, *args: str, **kwargs: Any) -> None:

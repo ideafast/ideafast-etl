@@ -7,13 +7,31 @@ import pytest
 from airflow.models import Connection
 
 from ideafast_etl.hooks.jwt import JwtHook
+from ideafast_etl.hooks.ucam import Device
 
 
 @pytest.fixture()
-def connection_extras():
+def old_jwt_key():
+    """Return a expired JWT key"""
+    return jwt.encode(
+        {"exp": datetime.now(tz=timezone.utc) - timedelta(seconds=30)}, "secret"
+    ).decode("utf-8")
+
+
+@pytest.fixture()
+def new_jwt_key():
+    """Return a valid JWT key"""
+    return jwt.encode(
+        {"exp": datetime.now(tz=timezone.utc) + timedelta(minutes=30)}, "secret"
+    ).decode("utf-8")
+
+
+@pytest.fixture()
+def connection_extras(new_jwt_key):
     return {
         "jwt_token_path": "jwt_token",
         "jwt_url": "test_jwt_url",
+        "jwt_token": new_jwt_key,
     }
 
 
@@ -28,41 +46,58 @@ def connection_default_kwargs():
 
 
 @pytest.fixture()
-def mock_get_connection(connection_extras, connection_default_kwargs):
-    """Return a test Connection for each Hook instance"""
-    test_connection = Connection(
+def mock_ucam_device_payload():
+    """Return a mocked payload from UCAM API (v1 - FS)"""
+    return [
+        {
+            "device_id": "NR1_DEVICE",
+            "patients": [
+                {
+                    "subject_id": "A-PATIENT",
+                    "subject_Group": 4,
+                    "start_Date": "2021-12-07T00:00:00",
+                    "end_Date": None,
+                    "deviations": None,
+                    "vtT_id": "vtt_test_id_A",
+                },
+                {
+                    "subject_id": "B-PATIENT",
+                    "subject_Group": 2,
+                    "start_Date": "2021-12-04T00:00:00",
+                    "end_Date": "2021-12-06T00:00:00",
+                    "deviations": "sample deviation",
+                    "vtT_id": "vtt_test_id_B",
+                },
+            ],
+        }
+    ]
+
+
+@pytest.fixture()
+def test_connection(connection_extras, connection_default_kwargs):
+    return Connection(
         **connection_default_kwargs,
         extra=json.dumps(connection_extras),
     )
-    with patch.object(
-        JwtHook, "get_connection", return_value=test_connection
-    ) as mock_connection:
-        yield mock_connection
-
-
-@pytest.fixture()
-def old_jwt_key():
-    """Return a mocked requests library"""
-    yield jwt.encode(
-        {"exp": datetime.now(tz=timezone.utc) - timedelta(seconds=30)}, "secret"
-    ).decode("utf-8")
-
-
-@pytest.fixture()
-def new_jwt_key():
-    """Return a mocked requests library"""
-    yield jwt.encode(
-        {"exp": datetime.now(tz=timezone.utc) + timedelta(minutes=30)}, "secret"
-    ).decode("utf-8")
 
 
 @pytest.fixture()
 def mock_requests(new_jwt_key):
-    """Return a mocked requests library"""
+    """Return a mocked requests library for the JWT hook"""
     with patch("ideafast_etl.hooks.jwt.requests") as mock_request:
         mock_request.Session().send.return_value.json.return_value = {
             "jwt_token": new_jwt_key
         }
+        yield mock_request
+
+
+@pytest.fixture()
+def mock_requests_ucam(mock_ucam_device_payload):
+    """Return a mocked requests library for the UCAM hook"""
+    with patch("ideafast_etl.hooks.jwt.requests") as mock_request:
+        mock_request.Session().get.return_value.json.return_value = (
+            mock_ucam_device_payload
+        )
         yield mock_request
 
 

@@ -1,4 +1,5 @@
 from datetime import datetime
+from unittest.mock import patch
 
 import pytest
 import requests
@@ -18,16 +19,32 @@ def test_resolve_patient_normalises_wears():
     assert False
 
 
-def test_get_device_found():
+def test_get_device_found(
+    test_connection,
+    mock_requests_ucam,
+):
     """Test that the device is found if in expected payload"""
 
-    assert False
+    with patch.object(UcamHook, "get_connection", return_value=test_connection):
+        ucam_hook = UcamHook()
+
+        result = ucam_hook.get_device("NR1_DEVICE")
+
+        assert result.device_id == "NR1_DEVICE"
 
 
-def test_get_device_not_found():
-    """Test that the device is NOT found if in expected payload"""
+def test_get_device_not_found(
+    test_connection,
+    mock_requests_ucam,
+):
+    """Test that the device is found if in expected payload"""
+    mock_requests_ucam.Session().get.return_value.json.return_value = []
+    with patch.object(UcamHook, "get_connection", return_value=test_connection):
+        ucam_hook = UcamHook()
 
-    assert False
+        result = ucam_hook.get_device("NOT_DEVICE")
+
+        assert result is None
 
 
 def test_get_patient_by_wear_within():

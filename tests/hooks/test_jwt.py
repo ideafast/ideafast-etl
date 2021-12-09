@@ -1,5 +1,5 @@
 import json
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 import requests
@@ -99,44 +99,47 @@ def test_jwt_get_token_not_valid(mock_requests, old_jwt_key, mock_setting_sessio
     mock_setting_session().commit.assert_called_once()
 
 
-def test_get_conn_returns_new(mock_requests, mock_setting_session, mock_get_connection):
+def test_get_conn_returns_new(mock_requests, mock_setting_session, test_connection):
     """Test that get_conn returns a new connection the first time"""
-    jwt_hook = JwtHook()
+    with patch.object(JwtHook, "get_connection", return_value=test_connection):
+        jwt_hook = JwtHook()
 
-    result = jwt_hook.get_conn()
+        result = jwt_hook.get_conn()
 
-    assert result == mock_requests.Session()
+        assert result == mock_requests.Session()
 
 
 def test_get_conn_returns_existing(
-    mock_requests, mock_setting_session, mock_get_connection
+    mock_requests, mock_setting_session, test_connection
 ):
     """Test that get_conn returns an existing one if already created"""
-    jwt_hook = JwtHook()
-    jwt_hook.get_conn()  # received mock_requests
-    jwt_hook.session = MagicMock()  # override with new mock
+    with patch.object(JwtHook, "get_connection", return_value=test_connection):
+        jwt_hook = JwtHook()
+        jwt_hook.get_conn()  # received mock_requests
+        jwt_hook.session = MagicMock()  # override with new mock
 
-    result = jwt_hook.get_conn()  # should return overrided mock, not new one
+        result = jwt_hook.get_conn()  # should return overrided mock, not new one
 
-    assert result is not mock_requests.Session()
+        assert result is not mock_requests.Session()
 
 
 @pytest.mark.parametrize("jwt_key", ["jwt_url", "jwt_token_path", "host"])
 @pytest.mark.xfail(raises=ValueError, strict=True)
 def test_get_conn_throws_jwt_keys(
-    jwt_key, connection_extras, connection_default_kwargs, mock_get_connection
+    jwt_key, connection_extras, connection_default_kwargs
 ):
     """Test that get_conn throws if jwt_url or jwt_token_path are not present"""
     if "jwt" in jwt_key:
         del connection_extras[jwt_key]
     else:
         del connection_default_kwargs[jwt_key]
-    mock_get_connection.return_value = Connection(
+    test_connection = Connection(
         **connection_default_kwargs,
         extra=json.dumps(connection_extras),
     )
-    jwt_hook = JwtHook()
+    with patch.object(JwtHook, "get_connection", return_value=test_connection):
+        jwt_hook = JwtHook()
 
-    result = jwt_hook.get_conn()  # should return overrided mock, not new one
+        result = jwt_hook.get_conn()  # should return overrided mock, not new one
 
-    assert result
+        assert result

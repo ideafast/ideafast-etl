@@ -24,7 +24,6 @@ def test_get_device_found(
     mock_requests_ucam,
 ):
     """Test that the device is found if in expected payload"""
-
     with patch.object(UcamHook, "get_connection", return_value=test_connection):
         ucam_hook = UcamHook()
 
@@ -47,28 +46,42 @@ def test_get_device_not_found(
         assert result is None
 
 
-def test_get_patient_by_wear_within():
-    """Test that a patient is found if within the wear period"""
+# TODO: Discuss what behaviour we want when timings cross boundaries?...
+@pytest.mark.parametrize(
+    "date1, date2, expected",
+    [
+        ([2021, 11, 4, 12, 0, 0], [2021, 11, 5, 12, 0, 0], "B-PATIENT"),
+        ([2021, 11, 6, 22, 0, 0], [2021, 11, 6, 23, 0, 0], "C-PATIENT"),
+        ([2021, 11, 13, 0, 0, 0], [2021, 11, 14, 0, 0, 0], "A-PATIENT"),
+        ([2021, 11, 1, 0, 0, 0], [2021, 11, 1, 0, 0, 0], None),
+        ([2021, 11, 3, 0, 0, 0], [2021, 11, 4, 12, 0, 0], None),
+        ([2021, 11, 6, 13, 0, 0], [2021, 11, 8, 0, 0, 0], None),
+    ],
+    ids=[
+        "within",
+        "within evening",
+        "within no end time",
+        "outside",
+        "outside early start",
+        "outside late end",
+    ],
+)
+def test_get_patient_by_wear_within(
+    date1,
+    date2,
+    expected,
+    test_connection,
+    mock_requests_ucam,
+):
+    """Test that a patient is correctly found (or not) if within the wear period, even without endwear"""
+    start_wear, end_wear = datetime(*date1), datetime(*date2)
+    with patch.object(UcamHook, "get_connection", return_value=test_connection):
+        ucam_hook = UcamHook()
+        patients = ucam_hook.get_device("NR1_DEVICE").patients
 
-    assert False
+        result = ucam_hook.get_patient_by_wear_period(patients, start_wear, end_wear)
 
-
-def test_get_patient_by_wear_within_no_endwear():
-    """Test that a patient is found if within the wear period despite no endwear"""
-
-    assert False
-
-
-def test_get_patient_by_wear_partially_outside():
-    """Test that patient is not found, because recording-end or start are not within"""
-
-    assert False
-
-
-def test_get_patient_by_wear_outside():
-    """Test that patient is not found, because recording is outside of period"""
-
-    assert False
+        assert result == expected
 
 
 @pytest.mark.parametrize(
@@ -80,7 +93,7 @@ def test_get_patient_by_wear_outside():
         ([2021, 3, 27, 0, 0, 0, 0], [2021, 3, 27, 1, 0, 0, 0]),
     ],
 )
-def test_normalise_day_true(date1, date2) -> None:
+def test_normalise_day_true(date1, date2):
     """Test that normalise day returns equal days in all cases"""
     one = UcamHook.normalise_day(datetime(*date1))
     two = UcamHook.normalise_day(datetime(*date2))

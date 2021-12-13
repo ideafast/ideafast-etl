@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import jwt
 import pytest
+from airflow.hooks.base import BaseHook
 from airflow.models import Connection
 
 from ideafast_etl.hooks.jwt import JwtHook
@@ -47,7 +48,7 @@ def connection_default_kwargs():
 
 @pytest.fixture()
 def mock_ucam_device_payload():
-    """Return a mocked payload from UCAM API (v1 - FS)"""
+    """Return a mocked payload from UCAM API (FS version)"""
     return [
         {
             "device_id": "NR1_DEVICE",
@@ -87,6 +88,13 @@ def test_connection(connection_extras, connection_default_kwargs):
         **connection_default_kwargs,
         extra=json.dumps(connection_extras),
     )
+
+
+@pytest.fixture()
+def mock_get_connection(test_connection):
+    with patch.object(BaseHook, "get_connection") as mock_get_conn:
+        mock_get_conn.return_value = test_connection
+        yield mock_get_conn
 
 
 @pytest.fixture()

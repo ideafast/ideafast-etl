@@ -1,5 +1,5 @@
 from datetime import datetime
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 import pytest
 import requests
@@ -7,43 +7,74 @@ import requests
 from ideafast_etl.hooks.ucam import UcamHook
 
 
-def test_resolve_patient_not_device():
+def test_resolve_patient_not_device(
+    test_connection,
+    mock_requests_ucam,
+    mock_get_connection,
+):
     """Test that the method returns None if the device is not found"""
+    # override return value
+    mock_requests_ucam.Session().get.return_value.json.return_value = []
 
-    assert False
+    ucam_hook = UcamHook()
+
+    result = ucam_hook.resolve_patient_id(
+        "NOT_DEVICE",
+        datetime(2021, 11, 4, 12, 0, 0),
+        datetime(2021, 11, 5, 12, 0, 0),
+    )
+
+    assert result is None
 
 
-def test_resolve_patient_normalises_wears():
+def test_resolve_patient_normalises_wears(
+    test_connection,
+    mock_requests_ucam,
+    mock_get_connection,
+):
     """Test that the method uses normalised days for comparison"""
+    equal_date = datetime(2021, 11, 4, 0, 0, 0, 0)
+    ucam_hook = UcamHook()
+    with patch.object(
+        ucam_hook, "get_patient_by_wear_period", return_value=None
+    ) as mocked_wear:
+        print(ucam_hook.get_patient_by_wear_period)
 
-    assert False
+        result = ucam_hook.resolve_patient_id(
+            "NR1_DEVICE",
+            datetime(2021, 11, 4, 12, 3, 55),
+            datetime(2021, 11, 4, 23, 9, 2),
+        )
+
+        print(ucam_hook.get_patient_by_wear_period.call_args)
+        ucam_hook.get_patient_by_wear_period.assert_called_with(
+            ANY, equal_date, equal_date
+        )
 
 
 def test_get_device_found(
     test_connection,
     mock_requests_ucam,
+    mock_get_connection,
 ):
     """Test that the device is found if in expected payload"""
-    with patch.object(UcamHook, "get_connection", return_value=test_connection):
-        ucam_hook = UcamHook()
+    ucam_hook = UcamHook()
 
-        result = ucam_hook.get_device("NR1_DEVICE")
+    result = ucam_hook.get_device("NR1_DEVICE")
 
-        assert result.device_id == "NR1_DEVICE"
+    assert result.device_id == "NR1_DEVICE"
 
 
-def test_get_device_not_found(
-    test_connection,
-    mock_requests_ucam,
-):
-    """Test that the device is found if in expected payload"""
+def test_get_device_not_found(test_connection, mock_requests_ucam, mock_get_connection):
+    """Test that the device is not found if in expected payload"""
+    # override return value
     mock_requests_ucam.Session().get.return_value.json.return_value = []
-    with patch.object(UcamHook, "get_connection", return_value=test_connection):
-        ucam_hook = UcamHook()
 
-        result = ucam_hook.get_device("NOT_DEVICE")
+    ucam_hook = UcamHook()
 
-        assert result is None
+    result = ucam_hook.get_device("NOT_DEVICE")
+
+    assert result is None
 
 
 # TODO: Discuss what behaviour we want when timings cross boundaries?...
@@ -67,21 +98,16 @@ def test_get_device_not_found(
     ],
 )
 def test_get_patient_by_wear_within(
-    date1,
-    date2,
-    expected,
-    test_connection,
-    mock_requests_ucam,
+    date1, date2, expected, test_connection, mock_requests_ucam, mock_get_connection
 ):
     """Test that a patient is correctly found (or not) if within the wear period, even without endwear"""
     start_wear, end_wear = datetime(*date1), datetime(*date2)
-    with patch.object(UcamHook, "get_connection", return_value=test_connection):
-        ucam_hook = UcamHook()
-        patients = ucam_hook.get_device("NR1_DEVICE").patients
+    ucam_hook = UcamHook()
+    patients = ucam_hook.get_device("NR1_DEVICE").patients
 
-        result = ucam_hook.get_patient_by_wear_period(patients, start_wear, end_wear)
+    result = ucam_hook.get_patient_by_wear_period(patients, start_wear, end_wear)
 
-        assert result == expected
+    assert result == expected
 
 
 @pytest.mark.parametrize(

@@ -145,6 +145,13 @@ def mock_requests_general():
         yield mock_request
 
 
+@pytest.fixture()
+def mock_requests_drm():
+    """Return a mocked requests library for the DRM hook"""
+    with patch("ideafast_etl.hooks.drm.requests") as mock_request:
+        yield mock_request
+
+
 # @pytest.fixture()
 # def mock_mongo_client():
 #     """Return a mocked MongoClient for the DB"""

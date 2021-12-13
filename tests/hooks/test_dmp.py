@@ -1,8 +1,6 @@
-import pytest
 import requests
 
 from ideafast_etl.hooks.dmp import DmpHook
-from tests.hooks.conftest import mock_requests
 
 
 def test_upload_success(tmp_path, mock_get_connection, mock_requests_general):

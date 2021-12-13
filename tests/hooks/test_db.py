@@ -1,7 +1,5 @@
 from unittest.mock import ANY, Mock, patch
 
-from airflow.providers.mongo.hooks.mongo import MongoHook
-
 from ideafast_etl.hooks.db import DeviceType, LocalMongoHook, Record
 
 

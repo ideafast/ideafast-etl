@@ -98,23 +98,28 @@ def mock_get_connection(test_connection):
 
 
 @pytest.fixture()
-def mock_requests(new_jwt_key):
+def mock_requests_general():
     """Return a mocked requests library for the JWT hook"""
     with patch("ideafast_etl.hooks.jwt.requests") as mock_request:
-        mock_request.Session().send.return_value.json.return_value = {
-            "jwt_token": new_jwt_key
-        }
         yield mock_request
 
 
 @pytest.fixture()
-def mock_requests_ucam(mock_ucam_device_payload):
+def mock_requests(mock_requests_general, new_jwt_key):
+    """Return a mocked requests library for the JWT hook"""
+    mock_requests_general.Session().send.return_value.json.return_value = {
+        "jwt_token": new_jwt_key
+    }
+    return mock_requests_general
+
+
+@pytest.fixture()
+def mock_requests_ucam(mock_requests_general, mock_ucam_device_payload):
     """Return a mocked requests library for the UCAM hook"""
-    with patch("ideafast_etl.hooks.jwt.requests") as mock_request:
-        mock_request.Session().get.return_value.json.return_value = (
-            mock_ucam_device_payload
-        )
-        yield mock_request
+    mock_requests_general.Session().get.return_value.json.return_value = (
+        mock_ucam_device_payload
+    )
+    return mock_requests_general
 
 
 @pytest.fixture()

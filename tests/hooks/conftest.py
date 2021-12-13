@@ -7,8 +7,42 @@ import pytest
 from airflow.hooks.base import BaseHook
 from airflow.models import Connection
 
+from ideafast_etl.hooks.db import DeviceType, Record
 from ideafast_etl.hooks.jwt import JwtHook
 from ideafast_etl.hooks.ucam import Device
+
+
+@pytest.fixture()
+def sample_record():
+    return Record(
+        _id=None,
+        hash="test_hash",
+        manufacturer_ref="test_ref",
+        device_type=DeviceType.BTF,
+        start=datetime(2021, 12, 13, 9, 22, 0),
+        end=datetime(2021, 12, 13, 11, 55, 0),
+    )
+
+
+@pytest.fixture()
+def sample_db_record():
+    def gen_record():
+        return {
+            "_id": None,
+            "hash": "test_hash",
+            "manufacturer_ref": "test_ref",
+            "device_type": "BTF",
+            "start": datetime(2021, 12, 13, 9, 22, 0),
+            "end": datetime(2021, 12, 13, 11, 55, 0),
+            "device_serial": "0123",
+            "device_id": None,
+            "patient_id": None,
+            "dmp_dataset": None,
+            "dmp_id": None,
+            "is_uploaded": False,
+        }
+
+    return gen_record
 
 
 @pytest.fixture()
@@ -90,6 +124,13 @@ def test_connection(connection_extras, connection_default_kwargs):
     )
 
 
+# @pytest.fixture()
+# def test_mongo_connection(connection_default_kwargs):
+#     with patch.object(BaseHook, "get_connection") as mock_get_conn:
+#         mock_get_conn.return_value = Connection(**connection_default_kwargs)
+#         yield mock_get_conn
+
+
 @pytest.fixture()
 def mock_get_connection(test_connection):
     with patch.object(BaseHook, "get_connection") as mock_get_conn:
@@ -102,6 +143,13 @@ def mock_requests_general():
     """Return a mocked requests library for the JWT hook"""
     with patch("ideafast_etl.hooks.jwt.requests") as mock_request:
         yield mock_request
+
+
+# @pytest.fixture()
+# def mock_mongo_client():
+#     """Return a mocked MongoClient for the DB"""
+#     with patch("ideafast_etl.hooks.db.MongoHook") as mock_mongo:
+#         yield mock_mongo
 
 
 @pytest.fixture()

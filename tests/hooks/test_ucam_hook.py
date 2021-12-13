@@ -47,7 +47,7 @@ def test_resolve_patient_normalises_wears(
         )
 
         print(ucam_hook.get_patient_by_wear_period.call_args)
-        ucam_hook.get_patient_by_wear_period.assert_called_with(
+        ucam_hook.get_patient_by_wear_period.assert_called_once_with(
             ANY, equal_date, equal_date
         )
 

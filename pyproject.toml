@@ -40,11 +40,11 @@ requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.coverage.paths]
-source = ["ideafast_etl"]
+source = ["/ideafast_etl"]
 
 [tool.coverage.run]
 branch = true
-source = ["ideafast_etl"]
+source = ["ideafast_etl", "dags", "cli.py"]
 
 [tool.coverage.report]
 show_missing = true

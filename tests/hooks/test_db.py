@@ -1,6 +1,7 @@
 from unittest.mock import ANY, Mock, patch
 
 from ideafast_etl.hooks.db import DeviceType, LocalMongoHook, Record
+from ideafast_etl.hooks.ucam import Device
 
 
 def test_record_as_dict_equals(sample_record):
@@ -60,6 +61,20 @@ def test_find_unknown_deviceid_only_none(sample_db_record):
         assert len(result) == 1
 
 
+def test_find_unknown_deviceid_only_none(sample_db_record):
+    """Test that finding unknown device IDs only returns unknown _and unique_ device ids"""
+    # override/disable inherited methods, including init()
+    LocalMongoHook.__bases__ = (Mock,)
+    db_hook = LocalMongoHook()
+
+    with patch.object(
+        db_hook, "find", return_value=[sample_db_record() for _ in range(5)]
+    ):
+        result = [r for r in db_hook.find_drm_deviceserial_is_none()]
+
+        assert len(result) == 1
+
+
 def test_find_notuploaded_dmps(sample_db_record):
     """Test that dmp_ids are returned even though some of the records with that ID are already uploaded"""
     # override/disable inherited methods, including init()
@@ -75,3 +90,13 @@ def test_find_notuploaded_dmps(sample_db_record):
 
         assert len(result) == 1
         assert result[0] == "test_id"
+
+
+def test_hash_generation():
+    """Test that hash generation is as expected with repeatable results"""
+
+    result = Record.generate_hash("abcd", DeviceType.BTF)
+
+    assert result == Record.generate_hash("abcd", DeviceType.BTF)
+    assert result != Record.generate_hash("abce", DeviceType.BTF)
+    assert result != Record.generate_hash("abcd", DeviceType.DRM)

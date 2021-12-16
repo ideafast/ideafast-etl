@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import jwt
 import pytest
+import requests
 from airflow.hooks.base import BaseHook
 from airflow.models import Connection
 
@@ -34,6 +35,7 @@ def sample_db_record():
             "device_type": "BTF",
             "start": datetime(2021, 12, 13, 9, 22, 0),
             "end": datetime(2021, 12, 13, 11, 55, 0),
+            "meta": {"dreem_uid": 1234},
             "device_serial": "0123",
             "device_id": None,
             "patient_id": None,
@@ -124,13 +126,6 @@ def test_connection(connection_extras, connection_default_kwargs):
     )
 
 
-# @pytest.fixture()
-# def test_mongo_connection(connection_default_kwargs):
-#     with patch.object(BaseHook, "get_connection") as mock_get_conn:
-#         mock_get_conn.return_value = Connection(**connection_default_kwargs)
-#         yield mock_get_conn
-
-
 @pytest.fixture()
 def mock_get_connection(test_connection):
     with patch.object(BaseHook, "get_connection") as mock_get_conn:
@@ -142,6 +137,7 @@ def mock_get_connection(test_connection):
 def mock_requests_general():
     """Return a mocked requests library for the JWT hook"""
     with patch("ideafast_etl.hooks.jwt.requests") as mock_request:
+        mock_request.HTTPError = requests.HTTPError
         yield mock_request
 
 
@@ -195,6 +191,7 @@ def haystack():
         "haystack1": {"haystack2": {"haystack3": None, "haystack4": needle}},
         "haystack5": [{"haystack6": None}, {"haystack7": needle}],
         "haystack8": {},
+        "haystack9": "",
     }
     return (payload, needle)
 

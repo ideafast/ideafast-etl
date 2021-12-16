@@ -38,6 +38,35 @@ def test_find_jwt_token_with_list(haystack):
     assert result == haystack[1]
 
 
+@pytest.mark.xfail(raises=KeyError, strict=True)
+def test_find_jwt_token_none_payload(haystack):
+    """test a None return (and therefore keyerror) when payload is not a list or dict"""
+
+    path = "[0].haystack9.and.more.path"
+    jwt_hook = JwtHook()
+
+    result = jwt_hook._find_jwt_token(path, [haystack[0], None])
+
+
+@pytest.mark.xfail(raises=KeyError, strict=True)
+def test_find_jwt_token_access_list_as_dict(haystack):
+    """test a None return (and therefore keyerror) when list payload is accesssed as dict"""
+
+    path = "haystack9"
+    jwt_hook = JwtHook()
+
+    result = jwt_hook._find_jwt_token(path, [haystack[0], None])
+
+
+@pytest.mark.xfail(raises=KeyError, strict=True)
+def test_find_jwt_token_indexerror(haystack):
+    """test for a suppressed index error when index is out of bounds"""
+    path = "[6].haystack5.[1].haystack7"
+    jwt_hook = JwtHook()
+
+    result = jwt_hook._find_jwt_token(path, [haystack[0], None])
+
+
 def test_find_jwt_token_starts_with_list(haystack):
     """Test that a deep token can be found"""
     path = "[0].haystack5.[1].haystack7"
@@ -85,6 +114,33 @@ def test_jwt_get_token_still_valid(mock_requests, new_jwt_key, mock_setting_sess
     assert result == new_jwt_key
     assert not mock_requests.called
     assert not mock_setting_session.called
+
+
+def test_jwt_get_first_token(mock_requests, mock_setting_session):
+    """Test that token validity checking is skipped when no token is yet generated"""
+    jwt_hook = JwtHook()
+    jwt_hook.jwt_token_path = "jwt_token"
+
+    with patch("ideafast_etl.hooks.jwt.jwt.decode") as mock_decode:
+
+        result = jwt_hook._get_jwt_token()
+
+        assert not mock_decode.called
+        assert mock_requests.Session.called
+        assert mock_setting_session.called
+
+
+@pytest.mark.xfail(raises=requests.HTTPError, strict=True)
+def test_jwt_json_error(mock_requests, mock_setting_session):
+    """test appropriate response in case of decoding error"""
+    mock_requests.Session().send.return_value.json.side_effect = (
+        json.decoder.JSONDecodeError("", "", 0)
+    )
+
+    jwt_hook = JwtHook()
+    jwt_hook.jwt_token_path = "jwt_token"
+
+    result = jwt_hook._get_jwt_token()
 
 
 def test_jwt_get_token_not_valid(mock_requests, old_jwt_key, mock_setting_session):

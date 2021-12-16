@@ -48,6 +48,21 @@ source = ["ideafast_etl", "dags", "cli.py"]
 
 [tool.coverage.report]
 show_missing = true
+exclude_lines = [
+    # db methods that are 'one line' wrappers
+    'def custom_',
+    'def __custom',
+    'def find_hashes',
+    'def find_patientid_is_none',
+    'def find_dmpid_is_none',
+    'def find_records_by_dmpid',
+    # context management methods
+    'def __enter__',
+    'def __exit__',
+    'def close',
+    # temporary helper methods
+    'def _csv_as_dict'
+]
 
 [tool.isort]
 profile = "black"

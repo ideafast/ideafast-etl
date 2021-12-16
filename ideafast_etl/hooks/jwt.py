@@ -2,7 +2,7 @@ import json
 import logging
 import re
 from functools import reduce
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 import jwt
 import requests
@@ -59,15 +59,19 @@ class JwtHook(BaseHook):
     def _find_jwt_token(self, jwt_path: str, jwt_payload: dict) -> str:
         """Get the token from the jwt_payload following the dot notated path"""
 
-        def get_despite_none(payload: Optional[dict], key: str) -> Any:
+        def get_despite_none(payload: Optional[Union[dict, list]], key: str) -> Any:
             """Try to get value from dict, even if dict is None"""
             if not payload or not isinstance(payload, (dict, list)):
                 return None
             # can also access lists if needed, e.g., if key is '[1]'
-            if (num_key := re.match(r"^\[(\d+)\]$", key)) is not None:
-                try:
-                    return payload[int(num_key.group(1))]
-                except IndexError:
+            if isinstance(payload, list):
+                if (num_key := re.match(r"^\[(\d+)\]$", key)) is not None:
+                    try:
+                        return payload[int(num_key.group(1))]
+                    except IndexError:
+                        return None
+                else:
+                    # accessing list through dict notation
                     return None
             else:
                 return payload.get(key, None)

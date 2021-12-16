@@ -197,3 +197,13 @@ def haystack():
         "haystack8": {},
     }
     return (payload, needle)
+
+
+@pytest.fixture()
+def temp_file(tmp_path):
+    dmp_dataset = "NR1DEVICE-APATIENT-20211213-20211213"
+    tmp_dir = tmp_path / "tmp"
+    tmp_dir.mkdir()
+    tmp_file = tmp_dir / f"{dmp_dataset}.txt"
+    tmp_file.touch()
+    return (tmp_file, dmp_dataset)

@@ -49,7 +49,9 @@ def test_download_file_success(mock_requests_drm, tmp_path):
         chunk_size * total_chunks
     )
     mock_requests_drm.get.return_value.__enter__.return_value.iter_content.return_value = iter(
+        # adding None to the list to invoke the if-statements to resolve to False
         [bytearray(chunk_size) for _ in range(total_chunks)]
+        + [None]
     )
 
     with patch.object(DreemHook, "get_conn", return_value=mock_conn):

@@ -25,6 +25,7 @@ class DeviceType(Enum):
     BED = 9  # EBedSensor
     VTP = 10  # Vital Patch
     YSM = 11  # ZKOne YOLI
+    WKS = 12  # FC.ID WildKeys
 
 
 @dataclass
@@ -229,3 +230,8 @@ class LocalMongoHook(MongoHook):
         """Get all hash representations of stored files"""
         result = self.__custom_find(filter={"device_type": device_type.name})
         return {r.hash for r in result}
+
+    def find_wildkeys_hashes(self) -> Dict[str, int]:
+        """Get all Wildkeys hash representations of stored files, including their sensor count"""
+        result = self.__custom_find(filter={"device_type": DeviceType.WKS})
+        return {r.hash: r.meta.get("count") for r in result}

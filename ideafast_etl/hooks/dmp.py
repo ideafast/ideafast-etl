@@ -146,8 +146,6 @@ class DmpHook(JwtHook):
                 )
                 raise requests.HTTPError from e
 
-            json_response = response.json()
-
             if "errors" in json_response:
                 logging.error(f"Response was: {json_response}")
                 raise Exception("UPLOAD_ERROR")
@@ -157,6 +155,7 @@ class DmpHook(JwtHook):
 
             return True
         except Exception:
+            # TODO: consider raising this; now this goes unnotticed (except the return False)
             logging.error("Exception:", exc_info=True)
         return False
 

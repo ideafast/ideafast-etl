@@ -96,15 +96,13 @@ class UcamHook(JwtHook):
         self, device_id: str, start_wear: datetime, end_wear: datetime
     ) -> Optional[str]:
         """Resolve a device ID to a patient_id based on the assigned wear period"""
+        if not (device := self.get_device(device_id)):
+            return None
+
         start_wear = self.normalise_day(start_wear)
         end_wear = self.normalise_day(end_wear)
-        device = self.get_device(device_id)
 
-        return (
-            self.get_patient_by_wear_period(device.patients, start_wear, end_wear)
-            if device
-            else None
-        )
+        return self.get_patient_by_wear_period(device.patients, start_wear, end_wear)
 
     def get_device(self, device_id: str) -> Optional[Device]:
         """Retrieve a device from the UCAM DB"""

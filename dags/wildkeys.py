@@ -168,7 +168,6 @@ with DAG(
                     # always remove local data, regardless of the outcome
                     dmp.rm_local_data(path.parent / f"{path.name}.zip")
                     logging.info("Removed (intermediate) downloaded files")
-                    pass
 
             logging.info(
                 f"retrieved {len(unfinished_dmp_ids)} folders to be uploaded with limit {limit}"

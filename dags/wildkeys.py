@@ -101,6 +101,8 @@ with DAG(
 
         Parameters
         ----------
+        download_folder: str
+            a unique folder name to use in this task (and the next)
         limit : None | int
             limit of how many down and upload pairs to handle this run - useful for testing
             or managing workload in batches
@@ -176,16 +178,12 @@ with DAG(
 
     def _cleanup(download_folder: str) -> None:
         """
-        Clean up any downloads into the
-
-        Unfortunately, dynamically generating task within a DAG is proven to be difficult and hacky.
-        For now, this task just sequentially handles down and upload.
+        Clean up any downloaded files that did not make it to an upload
 
         Parameters
         ----------
-        limit : None | int
-            limit of how many down and upload pairs to handle this run - useful for testing
-            or managing workload in batches
+        download_folder: str
+            a unique folder name used in the previous task
         """
         if Path(download_folder).is_dir():
             shutil.rmtree(download_folder)
@@ -200,8 +198,6 @@ with DAG(
 
     group_records = GroupRecordsOperator(
         task_id="group_records",
-        cut_off_time="12:00:00",
-        # TODO: discuss threshold with WP4 at TFTI
         device_type=DeviceType.WKS,
     )
 

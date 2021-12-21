@@ -30,7 +30,7 @@ with DAG(
 
     def _download_metadata(limit: Optional[int] = None) -> None:
         """
-        Retrieve records on Dreem's servers, filters only the new
+        Retrieve records on Wildkeys's servers. Patient information is provided.
 
         Parameters
         ----------
@@ -49,39 +49,44 @@ with DAG(
                 # records =  {partic1 : {date1 : [times], date2 : [times], ...}, partic2 : ...}
 
             # create hashes of found records, deduct with known records
-            known = db.find_wildkeys_hashes(DeviceType.WKS)
+            known = db.find_wildkeys_hashes()
 
             # generator for new records and records to update (consider 'new')
             new_record_gen = (
                 Record(
-                    _id=None,
+                    _id=known[hash][1] if hash in known else None,
                     hash=hash,
-                    manufacturer_ref=manu_ref,
+                    manufacturer_ref=date,
                     device_type=DeviceType.WKS,
                     start=datetime.fromtimestamp(min(timestamps)),
                     end=datetime.fromtimestamp(max(timestamps)),
                     meta=dict(count=len(timestamps)),
+                    patient_id=p,
+                    device_id="WKS-CF6ZKY",
                 )
                 for p, records in records_per_participant.items()
                 for date, timestamps in records.items()
-                if (
-                    hash := Record.generate_hash(
-                        manu_ref := f"{p}-{date}", DeviceType.WKS
-                    )
-                )
+                if (hash := Record.generate_hash(f"{p}/{date}", DeviceType.WKS))
                 not in known
-                or len(timestamps) != known[hash]
+                or len(timestamps) != known[hash][0]
             )
 
             new_records = list(islice(new_record_gen, limit))
-            new_ids = db.custom_insert_many(new_records) if new_records else []
+            new_ids = (
+                [
+                    db.custom_replace_one(r) if r._id else db.custom_insert_one(r)
+                    for r in new_records
+                ]
+                if new_records
+                else []
+            )
 
             # Logging
             logging.info(
                 f"{len([v for v in records_per_participant.values()])} WKS records found on the server"
             )
             logging.info(
-                f"{len(new_ids)} new Wildkeys records added to the DB (limit was {limit})"
+                f"{len(new_ids)} new Wildkeys records added or updated in the DB (limit was {limit})"
             )
 
     def _extract_prep_load(
@@ -122,7 +127,9 @@ with DAG(
                     # DOWNLOAD
                     total_records = len(records)
                     for index, record in enumerate(records, start=1):
-                        wks.download_file(record.manufacturer_ref, path)
+                        wks.download_file(
+                            record.patient_id, record.manufacturer_ref, path
+                        )
                         logging.debug(
                             f"Downloaded {index}/{total_records} files for {dmp_id}"
                         )
@@ -136,6 +143,8 @@ with DAG(
                         raise NotImplementedError
                     else:
                         # success = dmp.dmp_upload(dmp_dataset, zip_path)
+                        # FIXME: currently 'is_uploaded' is set to false
+                        # FIXME: change according to DMP versioning uploading system
                         success = dmp.upload(dmp_dataset, zip_path)
 
                     if not success:

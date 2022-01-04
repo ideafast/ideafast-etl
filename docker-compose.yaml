@@ -36,6 +36,10 @@
 ---
 version: '3.5'
 
+networks:
+  ideafastetl:
+    name: ideafast-etl
+
 x-ideafast-etl-variables:
   &ideafast-etl-env
   AIRFLOW_CONN_MONGO_DEFAULT: 'mongodb://${_MONGO_INITDB_ROOT_USERNAME}:${_MONGO_INITDB_ROOT_PASSWORD}@mongo:27017/%3FauthSource%3Dadmin'
@@ -69,6 +73,8 @@ x-airflow-common:
       condition: service_healthy
     mongodb:
       condition: service_healthy
+  networks:
+    - ideafastetl
 
 services:
   postgres:
@@ -84,6 +90,8 @@ services:
       interval: 5s
       retries: 5
     restart: always
+    networks:
+      - ideafastetl
 
   redis:
     image: redis:latest
@@ -95,6 +103,8 @@ services:
       timeout: 30s
       retries: 50
     restart: always
+    networks:
+      - ideafastetl
 
   mongodb:
     container_name: mongo
@@ -115,6 +125,8 @@ services:
       retries: 5
       start_period: 30s
     restart: always
+    networks:
+      - ideafastetl
 
   airflow-webserver:
     <<: *airflow-common
@@ -305,6 +317,8 @@ services:
       - |
         airflow connections import init/connections.yaml
         airflow variables import init/variables.json
+        airflow users create -e localhost -f local -l host -p '${_WP3API_AIRFLOW_PASS}' -r Viewer -u localhost
+      # FIXME: reconsider local authentication to airflow API
 
   flower:
     <<: *airflow-common

@@ -37,7 +37,7 @@
 version: '3.5'
 
 networks:
-  ideafastetl:
+  ideafast-etl:
     name: ideafast-etl
     external: true
 

@@ -23,7 +23,7 @@ def get_latest_docker_tag() -> Optional[str]:
     """Retrieve latest tag from the IDEAFAST Docker Images on you machine"""
     res = run_command(
         f"docker images {DOCKER_REGISTRY} --format {{{{.Tag}}}} "
-        f"| egrep -v 'latest' | sort -r | head -n 1",
+        f"| egrep -v 'latest|<none>' | sort -r | head -n 1",
         True,
     )
     return res.stdout.decode("ascii").rstrip() or None

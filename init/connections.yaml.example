@@ -49,3 +49,17 @@ dmp_default:
     }
   port: null
   schema: null
+
+wks_default:
+  conn_type: JWT
+  description: "Custom API connection with Wildkeys servers"
+  host: wks_url_api
+  login: wks_user
+  password: wks_pass
+  extra: |
+    {
+      "jwt_url": "wks_token_url",
+      "jwt_token_path": "dict.path.to.token",
+    }
+  port: null
+  schema: null

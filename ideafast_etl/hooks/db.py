@@ -3,7 +3,7 @@ import warnings
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, Generator, List, Optional, Set
+from typing import Any, Dict, Generator, List, Optional, Set, Tuple
 
 from airflow.providers.mongo.hooks.mongo import MongoHook
 from bson import ObjectId
@@ -25,6 +25,7 @@ class DeviceType(Enum):
     BED = 9  # EBedSensor
     VTP = 10  # Vital Patch
     YSM = 11  # ZKOne YOLI
+    WKS = 12  # FC.ID WildKeys
 
 
 @dataclass
@@ -77,6 +78,17 @@ class LocalMongoHook(MongoHook):
         """Insert one record into the DB, return the ID"""
         result = self.insert_one(**DEFAULTS, doc=record.as_db_dict)
         return result.inserted_id
+
+    def custom_replace_one(self, record: Record) -> ObjectId:
+        """
+        Replace one record into the DB, returns the ID
+
+        Uses the _id in the provided `record` to find the db document
+        """
+        result = self.replace_one(
+            **DEFAULTS, doc={"_id": record._id, **record.as_db_dict}
+        )
+        return result.acknowledged
 
     def custom_insert_many(self, records: List[Record]) -> List[ObjectId]:
         """Insert multiple records into the DB, return the ID"""
@@ -229,3 +241,8 @@ class LocalMongoHook(MongoHook):
         """Get all hash representations of stored files"""
         result = self.__custom_find(filter={"device_type": device_type.name})
         return {r.hash for r in result}
+
+    def find_wildkeys_hashes(self) -> Dict[str, Tuple[int, ObjectId]]:
+        """Get all Wildkeys hash representations of stored files, including their sensor count"""
+        result = self.__custom_find(filter={"device_type": DeviceType.WKS.name})
+        return {r.hash: (r.meta.get("count"), r._id) for r in result}

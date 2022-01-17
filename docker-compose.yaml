@@ -115,7 +115,7 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: ${_MONGO_INITDB_ROOT_PASSWORD}
       MONGO_INITDB_DATABASE: ideafast_etl
     ports:
-      - 27017:27017
+      - "27017"
     volumes:
       - etl_mongo-db-volume:/data/db
       - ./init/mongo-init.sh:/docker-entrypoint-initdb.d/mongo-init.sh:ro

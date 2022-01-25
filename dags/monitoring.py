@@ -5,6 +5,8 @@ from datetime import datetime
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
+from ideafast_etl.hooks.db import LocalMongoHook
+
 with DAG(
     dag_id="monitoring_weekly_digest",
     description="Pipeline health monitor weekly email digest",
@@ -38,7 +40,98 @@ with DAG(
 
     def _generate_report() -> None:
         """Audit sensor data DB and Pipeline Health and store report"""
-        pass
+        with LocalMongoHook() as db:
+
+            # count: total data records, inc. of which not uploaded
+            stats = db.query_stats(
+                [
+                    {
+                        "$group": {
+                            "_id": "$device_type",  # group by device type
+                            "total": {"$sum": 1},  # count all occurances
+                            "not_uploaded": {
+                                "$sum": {
+                                    "$cond": [{"$eq": ["$is_uploaded", False]}, 1, 0]
+                                }
+                            },
+                            # # NO device serial (only applicable to dreem?)
+                            # "no_device_serial": {
+                            #     "$addToSet": {
+                            #         "$cond": [
+                            #             {"$eq": ["$device_serial", None]},
+                            #             "$meta.dreem_uid",
+                            #             "$$REMOVE",
+                            #         ]
+                            #     }
+                            # },
+                            # A device serial, but no device ID
+                            "no_device_id": {
+                                "$addToSet": {
+                                    "$cond": [
+                                        {
+                                            "$and": [
+                                                {"$eq": ["$device_id", None]},
+                                                {"$ne": ["$device_serial", None]},
+                                            ]
+                                        },
+                                        "$device_serial",
+                                        "$$REMOVE",
+                                    ]
+                                }
+                            },
+                            # A device ID, but no patient ID
+                            "no_patient_id": {
+                                "$addToSet": {
+                                    "$cond": [
+                                        {
+                                            "$and": [
+                                                {"$eq": ["$patient_id", None]},
+                                                {"$ne": ["$device_id", None]},
+                                            ]
+                                        },
+                                        "$device_id",
+                                        "$$REMOVE",
+                                    ]
+                                }
+                            },
+                            # A patient ID, but no DMP dataset assigned
+                            "no_dmp_dataset": {
+                                "$addToSet": {
+                                    "$cond": [
+                                        {
+                                            "$and": [
+                                                {"$eq": ["$dmp_dataset", None]},
+                                                {"$ne": ["$patient_id", None]},
+                                            ]
+                                        },
+                                        "$patient_id",
+                                        "$$REMOVE",
+                                    ]
+                                }
+                            },
+                            # All ready, but somehow not uploaded. Possibly mismatch with DMP
+                            "no_uploaded": {
+                                "$addToSet": {
+                                    "$cond": [
+                                        {
+                                            "$and": [
+                                                {"$eq": ["$is_uploaded", False]},
+                                                {"$ne": ["$dmp_id", None]},
+                                            ]
+                                        },
+                                        "$dmp_id",
+                                        "$$REMOVE",
+                                    ]
+                                }
+                            },
+                        }
+                    }
+                ]
+            )
+
+            # report = {d["_id"]:  for}
+            for group in stats:
+                print(group)
 
     # Set all tasks
     generate_report = PythonOperator(

@@ -229,3 +229,7 @@ class LocalMongoHook(MongoHook):
         """Get all hash representations of stored files"""
         result = self.__custom_find(filter={"device_type": device_type.name})
         return {r.hash for r in result}
+
+    def query_stats(self, query: list) -> List[dict]:
+        """Query the records DB for sensor data progress"""
+        return self.aggregate(**DEFAULTS, aggregate_query=query)

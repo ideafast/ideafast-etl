@@ -6,6 +6,11 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 
 from ideafast_etl.hooks.db import LocalMongoHook
+from ideafast_etl.hooks.db_monitoring import (
+    LocalMonitorMongoHook,
+    MonitoringRecord,
+    DeviceMonitorRecord,
+)
 
 with DAG(
     dag_id="monitoring_weekly_digest",
@@ -28,20 +33,49 @@ with DAG(
     )
 
 
-def process_query(got_to_step: str, but_not_step: str) -> dict:
+def get_stats_query() -> dict:
     """Generate a reusable condition to check Record process"""
+
+    def sub_query(got_to_step: str, but_not_step: str) -> dict:
+        return {
+            "$addToSet": {  # stores a set of UNIQUE result
+                "$cond": [  # but only if...
+                    {
+                        "$and": [
+                            {
+                                "$ne": [f"${got_to_step}", None]
+                            },  # the got_to_step is true
+                            {
+                                "$not": [f"${but_not_step}"]
+                            },  # and the but_not_step is FALSY
+                        ]
+                    },
+                    f"${got_to_step}",  # then, add the known culprit
+                    "$$REMOVE",  # if not, do not add it
+                ]
+            }
+        }
+
     return {
-        "$addToSet": {  # stores a set of UNIQUE result
-            "$cond": [  # but only if...
-                {
-                    "$and": [
-                        {"$ne": [f"${got_to_step}", None]},  # the got_to_step is true
-                        {"$not": [f"${but_not_step}"]},  # and the but_not_step is FALSY
-                    ]
-                },
-                f"${got_to_step}",  # then, add the known culprit
-                "$$REMOVE",  # if not, do not add it
-            ]
+        "$group": {
+            "_id": "$device_type",  # group by device type
+            "total_db_records": {"$sum": 1},  # count all occurances
+            "not_uploaded": {
+                "$sum": {"$cond": [{"$eq": ["$is_uploaded", False]}, 1, 0]}
+            },
+            # A manufacturer_ref, but no device serial
+            # Only a Dreem issue
+            # "no_device_serial": process_query(
+            #     "manufacturer_ref", "device_serial"
+            # ),
+            # A device serial, but no device ID
+            "list_no_device_id": sub_query("device_serial", "device_id"),
+            # A device ID, but no patient ID
+            "list_no_patient_id": sub_query("device_id", "patient_id"),
+            # A patient ID, but no DMP dataset assigned
+            "list_no_dmp_dataset": sub_query("patient_id", "dmp_dataset"),
+            # All ready, but somehow not uploaded. Possibly mismatch with DMP
+            "list_not_uploaded": sub_query("dmp_id", "is_uploaded"),
         }
     }
 
@@ -59,36 +93,21 @@ with DAG(
     def _generate_report() -> None:
         """Audit sensor data DB and Pipeline Health and store report"""
         with LocalMongoHook() as db:
+            stats = db.query_stats([get_stats_query()])
 
-            # count: total data records, inc. of which not uploaded
-            query = {
-                "$group": {
-                    "_id": "$device_type",  # group by device type
-                    "total": {"$sum": 1},  # count all occurances
-                    "of_which_not_uploaded": {
-                        "$sum": {"$cond": [{"$eq": ["$is_uploaded", False]}, 1, 0]}
-                    },
-                    # A manufacturer_ref, but no device serial
-                    # Only a Dreem issue
-                    # "no_device_serial": process_query(
-                    #     "manufacturer_ref", "device_serial"
-                    # ),
-                    # A device serial, but no device ID
-                    "no_device_id": process_query("device_serial", "device_id"),
-                    # A device ID, but no patient ID
-                    "no_patient_id": process_query("device_id", "patient_id"),
-                    # A patient ID, but no DMP dataset assigned
-                    "no_dmp_dataset": process_query("patient_id", "dmp_dataset"),
-                    # All ready, but somehow not uploaded. Possibly mismatch with DMP
-                    "no_uploaded": process_query("dmp_id", "is_uploaded"),
-                }
-            }
+            report = MonitoringRecord(
+                date=datetime.now(),
+                pipeline_stats={
+                    stat["_id"]: DeviceMonitorRecord(
+                        **{k: v for k, v in stat.items() if k != "_id"}
+                    )
+                    for stat in stats
+                },
+            )
 
-            stats = db.query_stats([query])
-
-            # report = {d["_id"]:  for}
-            for group in stats:
-                print(group)
+            with LocalMonitorMongoHook() as monitoring_db:
+                monitoring_db.custom_insert_one(report)
+                print(monitoring_db.get_latest_stats())
 
     # Set all tasks
     generate_report = PythonOperator(
